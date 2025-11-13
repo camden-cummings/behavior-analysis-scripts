@@ -1,31 +1,18 @@
 #!/usr/bin/python
-import os,sys,glob,re
-import numpy as np
-import scipy
-from scipy import stats
-import datetime
-import time
-from datetime import timedelta
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from matplotlib import colors as c
-from matplotlib  import cm
-from scipy.stats.kde import gaussian_kde
-from numpy import linspace
-from scipy.stats import kruskal
-#from scipy.stats import nanmean
-#from scipy.stats import nanmedian
-import pandas as pd
-import statsmodels.api as sm
-from scipy.stats import mstats
-from matplotlib.ticker import FormatStrFormatter
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import ast
+
+import glob
 import math
 import operator
 
-# Helper
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy import stats
+from scipy.stats import mstats
 
 ops = { "<": operator.lt, ">": operator.gt}
 
@@ -330,7 +317,7 @@ def main(graphparametersfile, baselinelight, obendfilters, cbendfilters):
 		#ribgraph_mean_voltthreshold_day7dpfmsdf_responsevelocity_1_v120a001f1000d5pD995v200_a001%4%12_controlgroup-het.data
 		#ribgraph_mean_time_day3heatshock_dpix_bouttime_600_testgroup-hom.png
 		#ribgraph_mean_time_day3nightall_active_60over3600_testgroup-hom
-		nolabel = True
+		# nolabel = True
 		# Combine all data to generate a scale for heatmaps that goes across both datasets
 		catarray = np.concatenate(arraylist)
 		# Looking to see if shows up more than once, in which case we overwrite

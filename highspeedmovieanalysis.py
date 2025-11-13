@@ -30,19 +30,18 @@ timestamp file (only for long movies)
  
 """
 
+import argparse
+import datetime
+import glob
+import math
+import os
+import pickle
+
 import numpy as np
 import cv2
 from matplotlib.pyplot import imread
-import glob,argparse
 from scipy.stats import mode
-import math
 from PIL import Image, ImageFont, ImageDraw
-from pathlib import Path
-import datetime
-import re
-import glob
-import os
-import pickle
 
 parser = argparse.ArgumentParser(description='loading for fish behavior files')
 parser.add_argument('-r', type=str, action="store", dest="roisfile")
@@ -419,8 +418,8 @@ def createlongmovie():
        roimask[int(miny):int(maxy),int(minx):int(maxx)] = i
        i += 1
     numberofwells = i-1
-    numberofcols = int(i2/2)
-    numberofrows = int(numberofwells/numberofcols)
+    #numberofcols = int(i2/2)
+    #numberofrows = int(numberofwells/numberofcols)
     roimaskweights = convertMaskToWeights(roimask)
 
     cap = cv2.VideoCapture(videoStream)
@@ -469,7 +468,6 @@ def createlongmovie():
                     if roi_dict[int(roimask[cY,cX])][0][0] < area*perim:
                         roi_dict[int(roimask[cY,cX])][0] = (area*perim,cX,cY)
 
-        pixcounts = []
         pixcounts = np.bincount(roimaskweights, weights=diffpix.ravel())
         pixData[i,:] = np.hstack((pixcounts))
         counts = []
@@ -605,7 +603,7 @@ def main():
 
         counter += 1
         numcounter += 1
-#        print(counter, element)
+
         if element != 0:
              movielist.append(counter)
              i += 1
@@ -626,10 +624,7 @@ def main():
     del movielists[first:last]
     
     for x in movielists:
-#        print(x)
         for y in x:
-#            print(y)
-#            print(int(filenumber)-2)
             fnum = int(filenumber)
             if fnum <= 183 and fnum-2 == y:
                 print(fnum, fnum - 2)
@@ -751,7 +746,6 @@ def main():
                         roi_dict[int(roimask[cY,cX])][0] = (area*perim,cX,cY)
 
 #        print(len(roimaskweights), len(diffpix.ravel()))
-        pixcounts = []
         pixcounts = np.bincount(roimaskweights, weights=diffpix.ravel())
         pixData[i,:] = np.hstack((pixcounts))
         counts = []

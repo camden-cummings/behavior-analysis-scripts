@@ -1,28 +1,15 @@
 #!/usr/bin/python
 
-import os
-import sys
-import glob
-import re
 import numpy as np
-import scipy
 import datetime
-import time
-from datetime import timedelta
 from ProcessedData import ProcessedData  # ProcessedData object
-from scipy.stats import norm
-import copy
 import math
-import matplotlib
 import subprocess as sp
-import cProfile
 
 import fileloading  # prepares all the files
 import setupgraphsandsavedata
 import graphsstatsandfilter
 import operator
-
-# Helper
 
 # using "=" in this input code for strings, but it really means ==
 opsP = {"<": operator.lt, ">": operator.gt, "=": operator.eq}
@@ -200,11 +187,11 @@ def calculate_socialfrac(bout_start, bout_end, interbout_start, interbout_end, x
     intersmoments = 0
     tmoments = 0
     intertmoments = 0
-    socialfrac = 0.0
-    socialfraccloser = 0.0
-    intersocialfrac = 0.0
-    avesocialfrac = 0.0
-    interavesocialfrac = 0.0
+    #socialfrac = 0.0
+    #socialfraccloser = 0.0
+    #intersocialfrac = 0.0
+    #avesocialfrac = 0.0
+    #interavesocialfrac = 0.0
     totalx = 0.0
     intertotalx = 0.0
 # print("Qpt: ",qpt)
@@ -255,10 +242,10 @@ def calculate_centerfrac(bout_start, bout_end, interbout_start, interbout_end, r
     intercmoments = 0
     tmoments = 0
     intertmoments = 0
-    centerfrac = 0.0
-    intercenterfrac = 0.0
-    averhofrac = 0.0
-    interaverhofrac = 0.0
+    #centerfrac = 0.0
+    #intercenterfrac = 0.0
+    #averhofrac = 0.0
+    #interaverhofrac = 0.0
     totalrho = 0.0
     intertotalrho = 0.0
     for r3 in rhos[bout_start:(bout_end+1)]:
@@ -330,6 +317,7 @@ def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_
     halfpt = rhomax * 0.45  # this is what we are calling the halfpt
     unsignedthetas = thetas + np.pi
 
+    """
     centerfracs = []
     intercenterfracs = []
     averhofracs = []
@@ -339,6 +327,7 @@ def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_
     boutdistancesordpix = []
     boutdisplacements = []
     interbouttimes = []
+    """
 
     sleepbouts = []  # list of tuples for filtering waking activity
 
@@ -652,7 +641,7 @@ def CalculateEventProperties(name, eventsection, hs_dict, hs_distances, threshol
                     sumabsHA)
                 responseproperties["responseinitdirectionheadingangle"].append(
                     initdirHA)
-                # responseproperties["responseinitsumabsha"].append(initsumabs)
+
                 bout_tdist = 0
                 bout_cumdpix = 0
                 peak_dpix = 0

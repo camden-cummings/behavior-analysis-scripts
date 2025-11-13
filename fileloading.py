@@ -1,15 +1,10 @@
 #!/usr/bin/python
 
 import os
-import sys
 import glob
-import re
 import argparse
 import numpy as np
-import scipy
 import datetime
-import time
-from datetime import timedelta
 import os.path
 from os import path
 from Fish import Fish  # fish object
@@ -18,10 +13,8 @@ import matplotlib.pyplot as plt
 import pickle
 import pandas as pd
 import math
+from fileloading_labview import well_conversion
 
-# This dictionary is only used if -oldtracking is on, for old datasets before ROIs were saved by LabVIEW. Irrelevant for new users.
-#well_conversion = {0: 0, 8: 1, 16: 2, 24: 3, 32: 4, 40: 5, 48: 6, 56: 7, 64: 8, 72: 9, 80: 10, 88: 11, 1: 12, 9: 13, 17: 14, 25: 15, 33: 16, 41: 17, 49: 18, 57: 19, 65: 20, 73: 21, 81: 22, 89: 23, 2: 24, 10: 25, 18: 26, 26: 27, 34: 28, 42: 29, 50: 30, 58: 31, 66: 32, 74: 33, 82: 34, 90: 35, 3: 36, 11: 37, 19: 38, 27: 39, 35: 40, 43: 41, 51: 42, 59: 43, 67: 44, 75: 45, 83: 46, 91: 47,
-#                   4: 48, 12: 49, 20: 50, 28: 51, 36: 52, 44: 53, 52: 54, 60: 55, 68: 56, 76: 57, 84: 58, 92: 59, 5: 60, 13: 61, 21: 62, 29: 63, 37: 64, 45: 65, 53: 66, 61: 67, 69: 68, 77: 69, 85: 70, 93: 71, 6: 72, 14: 73, 22: 74, 30: 75, 38: 76, 46: 77, 54: 78, 62: 79, 70: 80, 78: 81, 86: 82, 94: 83, 7: 84, 15: 85, 23: 86, 31: 87, 39: 88, 47: 89, 55: 90, 63: 91, 71: 92, 79: 93, 87: 94, 95: 95}
 # Input arguments
 parser = argparse.ArgumentParser(description='loading for fish behavior files')
 parser.add_argument('-longmovie', type=str, action="store",
@@ -32,16 +25,16 @@ parser.add_argument('-r', type=str, action="store", dest="roisfile")
 # Tracked data from before code was updated to have output ROIs, irrelevant for new users, only compatible with 96-well plates
 parser.add_argument('-oldtracking', action="store_true",
                     dest="oldtracking", default=False)
-parser.add_argument('-graphonly', action="store_true",
-                    dest="graphonly", default=False)
 parser.add_argument('-xyhm', action="store_true", dest="xyhm", default=False)
 parser.add_argument('-social', action="store_true",
                     dest="social", default=False)
+parser.add_argument('-graphonly', action="store_true",
+                    dest="graphonly", default=False)
 # CURRENTLY NOT COMPATIBLE WITH STIMULI THAT NEED FILTERING
 parser.add_argument('-graphmulti', type=str, action="store", dest="dirlist")
 parser.add_argument('-j', type=str, action="store",
                     dest="graphparameters", default="PlotParameters")
-#parser.add_argument('-t', type=str, action="store", dest="tstampfile")
+
 parser.add_argument('-e', type=str, action="store", dest="eventsfile")
 parser.add_argument('-c', type=str, action="store", dest="centroidfile")
 parser.add_argument('-d', type=str, action="store", dest="dpixfile")
@@ -52,43 +45,6 @@ parser.add_argument('-s', type=str, action="store",
                     dest="sectionsfile", default="sectionsfile")
 parser.add_argument('-n', type=int, action="store",
                     dest="numberofwells", default=96)
-parser.add_argument('-i', type=float, action="store",
-                    dest="msecperframe", default=3.508772)
-# List of thresholds for the distance and dpix calculations, which typically should not be touched. First is for distance, which is less robust than dpix, and after is the dpix value. This is the threshold value to be counted for a bout if greater than or equal to.
-parser.add_argument('-v', type=str, action="store",
-                    dest="thresholdvalues", default="0.5,3.0")
-# List of high-speed thresholds for the distance and dpix calculations, which typically should not be touched. First is for distance, which is less robust than dpix, and after is the dpix value. This is the threshold value to be counted for a bout if greater than or equal to.
-parser.add_argument('-w', type=str, action="store",
-                    dest="hsthresholdvalues", default="0.9,3.0")
-# Same as above but for number of frames.
-parser.add_argument('-f', type=str, action="store",
-                    dest="thresholdframes", default="1,3")
-# Same as above but for number of frames and high-speed data.
-parser.add_argument('-x', type=str, action="store",
-                    dest="hsthresholdframes", default="2,3")
-# The classic Schier (and now Prober) sleep plots are inactive min / hour (sleep) and active sec / hour (with sleep bouts not counted)
-parser.add_argument('-a', type=str, action="store", dest="activitytimes",
-                    default="1/60,60/600,60/3600,1/3600")  # list of comparisons for activity data in seconds
-# thresholds for activity data, first distance and second dpix (differs from bout thresholds because we don't have frame considerations)
-parser.add_argument('-y', type=str, action="store",
-                    dest="activitytimesthresholds", default="1,10")
-# list of times bins for the bout data (ie, ave bout speed / minute) in seconds
-parser.add_argument('-b', type=str, action="store",
-                    dest="boutbins", default="60,600,3600")
-# ((boutrev > 4.0) and (0.3 < (boutspeed) < 1.3) and (boutdistance > 70)):
-parser.add_argument('-z', type=str, action="store",
-                    dest="seizurefilters", default="4.0,0.3,1.3,70")
-# baseline level of light, used to determine what is a dark flash for filtering O-bend
-parser.add_argument('-l', type=int, action="store",
-                    dest="lightbaseline", default=200)
-# two measures that are intersected (both must be true), and responses with greater magnitude than both are considered true O-bends. The two measures are "responsetime" and "sumabsha" (sum of absolute value of heading angles)
-parser.add_argument('-o', type=str, action="store", dest="obendfilter",
-                    default="60,>:responsetime,10,>:responsesumabsheadingangle")
-# two measures that are intersected (both must be true), and responses with greater magnitude than both are considered true C-bends. The two measures are "responsevelocity" and "responsecumdpix"
-parser.add_argument('-p', type=str, action="store", dest="cbendfilter",
-                    default="0.2,>:responsevelocity,1500,>:responsecumulativedpix")
-parser.add_argument('-k', type=str, action="store",
-                    dest="moviefilter", default="1,=:boutseizurecount")
 
 args = parser.parse_args()
 longmoviename = args.longmoviename
@@ -97,14 +53,11 @@ if (longmoviename != "nomovie"):
     longmovie = True
 roisfile = args.roisfile
 oldtracking = args.oldtracking
-outputmovies = args.outputmovies
 graphonly = args.graphonly
 xyhm = args.xyhm
 social = args.social
 graphmulti = args.dirlist
-graphparameters = args.graphparameters
 if ((not graphonly) and (not graphmulti)):
-#    tstampfile = args.tstampfile
     eventsfile = args.eventsfile
     centroidfile = args.centroidfile
     dpixfile = args.dpixfile
@@ -113,82 +66,14 @@ if ((not graphonly) and (not graphmulti)):
     sectionsfile = args.sectionsfile
 elif (graphmulti):
     graphmulti = list(map(str, args.dirlist.split(',')))
-    print(graphmulti)
-thresholdvalues = list(map(float, args.thresholdvalues.split(',')))
-hsthresholdvalues = list(map(float, args.hsthresholdvalues.split(',')))
-thresholdframes = list(map(int, args.thresholdframes.split(',')))
-hsthresholdframes = list(map(int, args.hsthresholdframes.split(',')))
-numberofwells = args.numberofwells
-msecperframe = args.msecperframe
-activitytimes = list(map(int, re.split(',|, |/|/', args.activitytimes)))
-activitytimesthresholds = list(
-    map(float, args.activitytimesthresholds.split(',')))
-# these bins and activity bins are not going to be less than a second (that doesn't work in code well), so it's fine to use int instead of float
-boutbins = list(map(int, args.boutbins.split(',')))
-seizurefilters = list(map(float, args.seizurefilters.split(',')))
-lightbaseline = args.lightbaseline
-obendfilter = list(map(str, args.obendfilter.split(',')))
-cbendfilter = list(map(str, args.cbendfilter.split(',')))
-moviefilter = list(map(str, args.moviefilter.split(',')))
 
-# Helper functions, cart2pol and faststrptime
+numberofwells = args.numberofwells
 
 # Convert cartesian coordinates to polar
-
-
 def cart2pol(x, y):
     rho = np.sqrt(x**2 + y**2)
     theta = np.arctan2(y, x)
     return (rho, theta)
-
-
-# A fast function for reading time data
-# This depends on have the below format as output, which it is from our LabView program
-def faststrptime(val):
-    # Example
-    # 6/18/201612:59:34 PM
-    splits1 = val.split("/")
-    splits2 = splits1[2].split(":")
-    return datetime.datetime(
-        int(splits1[2][0:4]),  # %Year
-        int(splits1[0]),  # %Month
-        int(splits1[1]),  # %Day
-        int(splits2[0][4:len(splits2[0])]),  # %Hour
-        int(splits2[1]),  # %Minute
-        int(splits2[2][0:2]),  # %Second
-    )
-
-# End Helper functions
-
-# Load the roi data, for analyzing long movies
-
-
-def load_rois(roi_dict):
-    f = open(roisfile, 'r')
-    lines = f.readlines()
-    i = 1
-    for line in lines:
-        try:
-            print(int(line.split(' ')[0]))
-        except ValueError:
-            continue
-        minx = int(line.split(' ')[0])
-        miny = int(line.split(' ')[1])
-        maxx = int(line.split(' ')[2])
-        maxy = int(line.split(' ')[3])
-        if social:
-            # print("ROIS BEFORE ", minx, miny, maxx, maxy)
-            if minx < 400:  # could make this the halfway point of the image or something, but just going with a value I'm sure will work is ok until the code needs to be more flexible.
-                # VALUE USED FOR ALMOST ALL ANALYSIS PREVIOUSLY
-                maxx = maxx - (0.13 * (maxx - minx))
-                # minx = minx + (0.01 * (maxx - minx)) # Also trimming on this side to avoid calls of the fish in the acrylic window in some cases
-            else:
-                minx = minx + (0.13 * (maxx - minx))
-                # maxx = maxx - (0.01 * (maxx - minx))
-            # print("ROIS AFTER ", minx, miny, maxx, maxy)
-        roi_dict[i] = [minx, miny, maxx, maxy]
-        i += 1
-
 
 # Loading of the centroid position data for the high-speed movies
 def load_movie_motion_pos(hs_pos, thistime, fn):
@@ -207,7 +92,6 @@ def load_movie_motion_pos(hs_pos, thistime, fn):
 #    print(hscen_data_array)
     hs_pos[thistime] = hscen_data_array
 
-
 # Loading of the delta pixel motion data for the high-speed movies
 def load_movie_motion(hs_dpix, thistime, moviename):
     if not path.exists(moviename):
@@ -224,7 +108,6 @@ def load_movie_motion(hs_dpix, thistime, moviename):
     hsdp_data_array = hsdp_data_array.reshape(
         hsdp_data_array.size // numberofwells, numberofwells)
     hs_dpix[thistime] = hsdp_data_array
-
 
 # Loading in the high-speed movies and the sections we will analyze (sectionsfile)
 def load_event_data(startdate, endDT, startDT):
@@ -329,95 +212,6 @@ def load_event_data(startdate, endDT, startDT):
 #    print(events)
     return (hs_dpix, hs_pos, events)
 
-
-# The milliseconds are estimated based on the number of frames per that second
-# It is clearly not accurate if a chunk of frames were lost in just the middle, for example
-# However it is useful for downstream analyses to have milliseconds, in particular if one has to analyze responses in the slow speed data
-def convert_to_ms_time(timestamp_data_array, timestamp_data_dict):
-    mstimestamp_data_array = timestamp_data_array
-    startt = timestamp_data_array[0]
-    mseccounter = 0
-    for position in range(0, len(timestamp_data_array)):
-        if (position + 1) != len(timestamp_data_array):
-            if timestamp_data_array[position] == timestamp_data_array[position + 1]:
-                mseccounter = mseccounter + 1
-            else:
-                startpos = position - mseccounter
-                msec = 1000.0 / ((position - startpos) + 1)
-                for i in range(startpos, position + 1):
-                    newsec = timestamp_data_array[i] + \
-                        datetime.timedelta(milliseconds=msec*(i-startpos))
-                    mstimestamp_data_array[i] = newsec
-                mseccounter = 0
-        else:
-            mseccounter = mseccounter + 1
-            startpos = position - mseccounter
-            msec = 1000.0 / ((position - startpos) + 1)
-            for i2 in range(startpos, position + 1):
-                newsec = timestamp_data_array[i2] + \
-                    datetime.timedelta(milliseconds=msec*(i2-startpos))
-                mstimestamp_data_array[i2] = newsec
-            mseccounter = 0
-            break
-    return mstimestamp_data_array
-
-
-# The sections file is in 24 hour time, as is Python code
-def load_timestamp_file():
-    # Loading in the timestamp file data
-    # Used to have to get rid of the ^M character that is between the times, but not with updated Anaconda
-    timestamp_data_array = []
-    dropped_seconds = []
-    f = open(tstampfile, 'r')
-    lines = f.readlines()
-    f.close()
-    for line in lines:
-        timestamp_data_array.append(line.strip())
-    n = 0
-    timestamp_data_dict = {}
-    lasttime = None
-    starttime = None
-    for t in timestamp_data_array:
-        thistime = faststrptime(t)
-        # I can't include the AM/PM in the faststrptime loading for speed reasons
-        # So input times are assumed to just be AM (other than 12, assumed PM), and this adding/subtracting converts to 24 hour
-        thisAMorPM0 = t.split()[len(t.split())-1]
-        if thistime.hour == 12:
-            if thisAMorPM0 == "AM":
-                thistime = thistime + datetime.timedelta(hours=-12)
-        elif thisAMorPM0 == "PM":
-            thistime = thistime + datetime.timedelta(hours=12)
-        timestamp_data_array[n] = thistime
-        timestamp_data_dict[thistime] = n
-        # Account for situation at beginning, so we don't enter code below and try to subtract
-        if n == 0:
-            n = n + 1
-            lasttime = thistime
-            starttime = thistime
-            continue
-        # This step is important later for the fast slicing of the data
-        # Missing seconds need to be accounted for so we know not to expect it
-        # Ideally we do not lose that amount of frames, but it can happen
-        tdelta1 = thistime - lasttime
-        testtime = thistime - \
-            datetime.timedelta(seconds=tdelta1.total_seconds())
-        if thistime != lasttime:
-            timestamp_data_dict[thistime] = n
-            if tdelta1.total_seconds() > 1:
-                for x in range(0, int(tdelta1.total_seconds()-1)):
-                    print("DROPPED A SECOND: ", thistime, lasttime, testtime, testtime + datetime.timedelta(
-                        seconds=1), timestamp_data_array[n], n-1, timestamp_data_array[n-1])
-                    dropped_seconds.append(
-                        testtime + datetime.timedelta(seconds=1))
-                    testtime = testtime + datetime.timedelta(seconds=1)
-            lasttime = thistime
-        n = n + 1
-    mstimestamp_data_array = convert_to_ms_time(
-        timestamp_data_array, timestamp_data_dict)
-#    print(len(timestamp_data_array), len(mstimestamp_data_array), len(timestamp_data_dict))
-    return (mstimestamp_data_array, timestamp_data_dict, dropped_seconds, thistime, starttime)
-
-
 # Find max and min value for each fish in order to identify well edges
 # This is actually not really the well edges, but the edges of the fish's radius of movement
 # I prefer this approach to reading in the originally designated ROI, just in case ROI isn't accurate (ie, includes extra plastic of well edge)
@@ -448,7 +242,6 @@ def max_min(cen_data_array):
     minxysnp = np.array(minxys)
     return (maxxysnp, minxysnp)
 
-
 # Polar coordinates are essential for easy calculation of well edge/center preferences
 def convert_to_polar(cen_data_array):
     (maxxysnp, minxysnp) = max_min(cen_data_array)
@@ -477,7 +270,6 @@ def convert_to_polar(cen_data_array):
             xzerod[:, i] = cen_data_array[:, 2*i]
             yzerod[:, i] = cen_data_array[:, 2*i+1]
     return (rhodata, thetadata, xzerod, yzerod)
-
 
 # The Fish object carries all the data around for each fish, including their genotype and ID number
 # Later (after processmotiondata.py) the data inside this Fish object is analyzed (bouts counted, binned, responses counted) and the AnalyzedFish object carries that data
@@ -723,7 +515,6 @@ def get_timestamps_from_csv(filename):
 
     return timests
 
-
 def get_rois_from_csv(cell_filename):
     print(cell_filename)
     dict = {}
@@ -738,8 +529,6 @@ def get_rois_from_csv(cell_filename):
     return dict
 
 # Start here
-
-
 def loading_procedures():
     rois_dict = {}
 #    if (roisfile or longmovie or social):
@@ -756,7 +545,7 @@ def loading_procedures():
     print("0", global_tuple_events[0])
     print("1", global_tuple_events[1])
     print("2", global_tuple_events[2])
-# tuple_timestamps = load_timestamp_file()
+
     if (longmovie):
         firstdpix = open(dpixfile, 'r')
         dp_data_list = []
@@ -792,6 +581,7 @@ def loading_procedures():
            tuple_timestamps = pickle.load(fp)
     else:
        tuple_timestamps = get_timestamps_from_csv(centroidfile)
+
     print("Done loading timestamp file")
 
     # just setting to zero to make it easier to ignore
