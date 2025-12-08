@@ -517,8 +517,38 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
             if len(v3) == 0:
                 continue
             if "responsefull" in k3:
-                binnedlist.append(ProcessedData(
-                    k3, np.nanmean(v3, axis=0), (event,), name))
+                indic = []
+                for ind, arr in enumerate(v3):
+                   if len(arr[~np.isnan(arr)]) == 0:
+                      indic.append(ind)
+
+                if len(indic) > 0:
+                   newv3 = []
+                   for ind, item in enumerate(v3):
+                      if ind not in indic:
+                         print('i', item.shape)
+                         newv3.append(item)
+                   print(v3, newv3)
+                   binnedlist.append(ProcessedData(k3, np.nanmean(newv3, axis=0), (event,), name))
+            if "responsefull" in k3:
+                print(k3)
+                indic = []
+                for ind, arr in enumerate(v3):
+                   if len(arr[~np.isnan(arr)]) == 0:
+                      indic.append(ind)
+
+                if len(indic) > 0:
+                   newv3 = []
+                   for ind, item in enumerate(v3):
+                      if ind not in indic:
+                         print('i', item.shape)
+                         newv3.append(item)
+                   print(v3, newv3)
+                   binnedlist.append(ProcessedData(k3, np.nanmean(newv3, axis=0), (event,), name))
+
+                else:
+                   binnedlist.append(ProcessedData(
+                       k3, np.nanmean(v3, axis=0), (event,), name))
             else:
                 binnedlist.append(ProcessedData(k3, v3, (event,), name))
     return binnedlist
@@ -548,7 +578,7 @@ def determine_indices(timestamp_data_array, timeinterval, timestart, timeend, ti
                    intervalindices.append(indext-1)
                    intervalindices.append(indext)
                 except Exception as e:
-                   print(e)
+                   print('error', e)
     else:  # If we are going to be doing every frame instead of by a set time, can't go less than second intervals using the time approach
         # Therefore this part of the code is not relevant really we don't want to do less than one second intervals
         # Need to add the one because I already put the first index in earlier
@@ -690,6 +720,7 @@ def process_all_data():
         indexdict[str(t)] = binindices
         # Adding the start and end indices for all possible binning for every eventsection, even if you don't need every single one (the numerator bins aren't used)
         for es1 in eventsectionlist:
+            print("es1", es1.starttime, es1.endtime)
             indstart, indend = find_indices(
                 es1.starttime, es1.endtime, timestamp_data_dict, binindices)
             es1.add_indices(t, indstart, indend)

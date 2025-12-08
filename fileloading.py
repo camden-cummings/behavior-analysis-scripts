@@ -13,6 +13,7 @@ import pandas as pd
 from fileloading_labview import well_conversion
 from fileloading_helpers import get_dists_and_posns, get_rois_from_csv, get_timestamps_from_csv, load_sections_file, load_highspeed_data, convert_to_polar
 
+
 # Input arguments
 parser = argparse.ArgumentParser(description='loading for fish behavior files')
 parser.add_argument('-longmovie', type=str, action="store",
@@ -29,7 +30,7 @@ parser.add_argument('-social', action="store_true",
 parser.add_argument('-graphonly', action="store_true",
                     dest="graphonly", default=False)
 # CURRENTLY NOT COMPATIBLE WITH STIMULI THAT NEED FILTERING
-parser.add_argument('-graphmulti', type=str, action="store", dest="dirlist")
+parser.add_argument('-graphmulti', type=str, action="store", dest="graphmulti")
 parser.add_argument('-j', type=str, action="store",
                     dest="graphparameters", default="PlotParameters")
 
@@ -271,12 +272,12 @@ def loading_procedures():
 
     # This is when the run started, calculated from the timestamp file and it is useful for putting event data on correct day
     # Day "0" in the sections file corresponds to this start date from the very beginning of the timestamp file
-    #    startdate = str(tuple_timestamps[0][0].month) + "/" + str(
-    #        tuple_timestamps[0][0].day) + "/" + str(tuple_timestamps[0][0].year)
-    #    endDT = tuple_timestamps[3]
-    #    print(startdate, endDT)
-    #    startDT = tuple_timestamps[4]
-    #    print(startDT)
+    startdate = str(tuple_timestamps[0][0].month) + "/" + str(
+        tuple_timestamps[0][0].day) + "/" + str(tuple_timestamps[0][0].year)
+    endDT = tuple_timestamps[3]
+    print('startdate', startdate, 'endDT', endDT)
+    startDT = tuple_timestamps[4]
+    print('startDT', startDT)
 
     #    global_tuple_events = load_event_data(startdate, endDT, startDT)
     print("Done loading events")
@@ -289,3 +290,9 @@ def loading_procedures():
 
 def initialize_args():
     print("Initializing arguments")
+
+if __name__ == "__main__":
+    rois_dict = get_rois_from_csv(roisfile)
+    print(rois_dict)
+
+
