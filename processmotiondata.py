@@ -677,14 +677,33 @@ def CalculateEventProperties(name, eventsection, hs_dict, hs_distances, threshol
                     float(bout_disp) / float(bout_time))
                 responseproperties["responsefulldpixdata"].append(
                     hs_dict[eventtime][startframe:endframe])
-                responseproperties["responsefulldata"].append(
-                    hs_distances[eventtime][startframe:endframe])
+                responseproperties["responsefulldata"].append(np.array(hs_distances[eventtime][startframe:endframe]))
+                print(eventtime, "dpix", np.array(hs_dict[eventtime][startframe:endframe]).shape)
+                print(np.array(hs_distances[eventtime][startframe:endframe]).shape)
+
+        print('sf, ef, et', startframe, endframe, eventtime)
         for k3, v3 in responseproperties.items():
             if len(v3) == 0:
                 continue
             if ("responsefull" in k3):
-                binnedlist.append(ProcessedData(
-                    k3, np.nanmean(v3, axis=0), (event,), name))
+                print(k3)
+                indic = []
+                for ind, arr in enumerate(v3):
+                   if len(arr[~np.isnan(arr)]) == 0:
+                      indic.append(ind)
+
+                if len(indic) > 0:
+                   newv3 = []
+                   for ind, item in enumerate(v3):
+                      if ind not in indic:
+                         print('i', item.shape)
+                         newv3.append(item)
+                   print(v3, newv3)
+                   binnedlist.append(ProcessedData(k3, np.nanmean(newv3, axis=0), (event,), name))
+
+                else:
+                   binnedlist.append(ProcessedData(
+                       k3, np.nanmean(v3, axis=0), (event,), name))
             else:
                 binnedlist.append(ProcessedData(k3, v3, (event,), name))
     return binnedlist
@@ -722,7 +741,7 @@ def determine_indices(timestamp_data_array, timeinterval, timestart, timeend, ti
                    intervalindices.append(indext-1)
                    intervalindices.append(indext)
                 except Exception as e:
-                   print(e)
+                   print('error', e)
     else:  # If we are going to be doing every frame instead of by a set time, can't go less than second intervals using the time approach
         # Therefore this part of the code is not relevant really we don't want to do less than one second intervals
         # Need to add the one because I already put the first index in earlier
@@ -949,7 +968,7 @@ def bout_flexactivity(boutproperties, bout_startsl0, intervalindices0, timebin):
     # datadict["socialpreference"] = [x for x in datadict["socialpreference"] if not math.isnan(x)]
 
     for k2, v2 in datadict.items():
-        print("KV", k2, v2)
+#        print("KV", k2, v2)
         if (len(v2) == 0):
             continue
         if (np.isnan(v2).all()):
@@ -968,7 +987,7 @@ def process_all_data():
      dropped_seconds, eventsectionlist) = fileloading.loading_procedures()
     all_fish_bouts = {}
     dpix_all_fish_bouts = {}
-    print(timestamp_data_array[0].microsecond)
+#    print(timestamp_data_array[0].microsecond)
 #    print(timestamp_data_array)
 #    print(timestamp_data_dict)
     # Obtain indices for the binning used to analyze bouts and also activity (classic sleep plots) data
@@ -978,7 +997,7 @@ def process_all_data():
     allbins = fileloading.activitytimes + fileloading.boutbins
     allbinsset = set(allbins)
     indexdict = {}
-    print("allbinsset", allbinsset)
+#    print("allbinsset", allbinsset)
     for t in allbinsset:
  #       print(t)
         binindices = determine_indices(timestamp_data_array, int(
@@ -987,7 +1006,7 @@ def process_all_data():
         indexdict[str(t)] = binindices
         # Adding the start and end indices for all possible binning for every eventsection, even if you don't need every single one (the numerator bins aren't used)
         for es1 in eventsectionlist:
-            print(es1.starttime, es1.endtime)
+            print("es1", es1.starttime, es1.endtime)
             indstart, indend = find_indices(
                 es1.starttime, es1.endtime, timestamp_data_dict, binindices)
             es1.add_indices(t, indstart, indend)

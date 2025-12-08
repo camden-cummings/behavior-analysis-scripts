@@ -64,7 +64,7 @@ def savedataandplot(eventsectionlist, fish_list):
                     binnednames.add((b.name, b.time_bin))
 
         for bd in binnednames:
-            print(bd)
+            print('binnedname', bd)
             splitfishlist = {}
             splitfishids = {}
             for g in genotypes:
