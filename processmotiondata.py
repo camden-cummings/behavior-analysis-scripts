@@ -11,6 +11,8 @@ import setupgraphsandsavedata
 import graphsstatsandfilter
 import operator
 
+from social import socialactivity
+
 # using "=" in this input code for strings, but it really means ==
 opsP = {"<": operator.lt, ">": operator.gt, "=": operator.eq}
 
@@ -22,13 +24,13 @@ opsP = {"<": operator.lt, ">": operator.gt, "=": operator.eq}
 # When deciding if a fish just moved and is therefore not valid, would want to look back a certain number of frames, maybe even 300 msec, so that would automatically remove all prepulse responses unless we increase the distance between them. Maybe it's best to eliminate all fish that happened to move in the window starting
 
 
-def setup_frames(ekinput):
-    start = ekinput.split('%')[1]
-    end = ekinput.split('%')[2]
+def setup_frames(event_frame):
+    start = event_frame.split('%')[1]
+    end = event_frame.split('%')[2]
     return range(int(start), int(end))
 
 
-# Formuala is square root of r1^2 + r2^2 - 2r1r2cos(theta1-theta2)
+# Formula is square root of r1^2 + r2^2 - 2r1r2cos(theta1-theta2)
 # Don't really need this now that I'm saving the x,y coordinates also, but will just keep anyway
 def polar_to_distance(rho1, rho2, theta1, theta2):
     # Large values of rho means that the fish has not moved yet
@@ -81,7 +83,7 @@ def save_movie(fish_id, fish_rois, bs, be):
     # sp.call('ffmpeg -i ' + 'crop_' + moviename + ' -filter:v scale="150:-1" ' + 'scalecrop_' + moviename, shell=True)
 
 
-def PolyArea(xarr, yarr):  # x and y are the coordinate lists for bout start to bout end
+def poly_area(xarr, yarr):  # x and y are the coordinate lists for bout start to bout end
     pA = 0.5*np.abs(np.dot(xarr, np.roll(yarr, 1)) -
                     np.dot(yarr, np.roll(xarr, 1)))
     if pA < 300:
@@ -91,22 +93,17 @@ def PolyArea(xarr, yarr):  # x and y are the coordinate lists for bout start to 
         return np.nan
 
 # For getting the start and end index of each event section, depending on how it was binned
-
-
-def find_indices(timestart, timeend, timestamp_data_dict, startindices):
-    startindex = timestamp_data_dict[timestart]
-    endindex = timestamp_data_dict[timeend]
-    shortstartindex = np.searchsorted(startindices[::2], startindex) - 1
-    shortendindex = np.searchsorted(startindices[::2], endindex) - 1
-    return shortstartindex, shortendindex
+def find_indices(time_start, time_end, timestamp_data_dict, start_indices):
+    start_index = timestamp_data_dict[time_start]
+    end_index = timestamp_data_dict[time_end]
+    short_start_index = np.searchsorted(start_indices[::2], start_index) - 1
+    short_end_index = np.searchsorted(start_indices[::2], end_index) - 1
+    return short_start_index, short_end_index
 
 # Calculate heading angle
-
-
-def HeadingAngle(xarr, yarr, bout_start, bout_end, hs=False):
+def heading_angle(xarr, yarr, bout_start, bout_end):
     angles = []
-    angvels = []
-    initdir = 1
+    init_dir = 1
     for i in range(bout_start, (bout_end-1)):
         a = np.array([xarr[i], yarr[i]])
         b = np.array([xarr[i+1], yarr[i+1]])
@@ -115,24 +112,24 @@ def HeadingAngle(xarr, yarr, bout_start, bout_end, hs=False):
         bc = b - c
         bc_atan = np.arctan2(np.cross(ba, bc), np.dot(ba, bc))
         if np.abs(bc_atan) != 0:
-            turnangle = (np.pi - np.abs(bc_atan)) * np.sign(bc_atan)
+            turn_angle = (np.pi - np.abs(bc_atan)) * np.sign(bc_atan)
         else:
-            turnangle = 0
-        angles.append(turnangle)
+            turn_angle = 0
+        angles.append(turn_angle)
         # Direction of initial turn
         # Negative signed turns are counterclockwise, positive are clockwise
         if i == bout_start:
             if np.abs(bc_atan) != 0:
-                initdir = initdir * np.sign(bc_atan)
+                init_dir = init_dir * np.sign(bc_atan)
             else:
-                initdir = 0
-    return np.sum(angles), np.sum(np.abs(angles)), initdir
+                init_dir = 0
+    return np.sum(angles), np.sum(np.abs(angles)), init_dir
 
 
 # Calculate the revolutions in the well for the bout - important for potential seizures
 # This is different from heading angle because it is based on the center of the well (looking for animals that circle well edges)
 #  if ((fish_rev > 4.0) and (300 < fish_speed < 1300) and (fish_dist > 70)) = potential seizure
-def calculate_boutrev(bout_start, bout_end, unsignedthetas, rhos):
+def calculate_boutrev(bout_start, bout_end, unsignedthetas):
     thetasum = 0
     for r2 in range(bout_start, bout_end):
         currenttheta = unsignedthetas[r2]
@@ -143,7 +140,7 @@ def calculate_boutrev(bout_start, bout_end, unsignedthetas, rhos):
         if thetasub < -np.pi:
             thetasub = thetasub + (2 * np.pi)
         thetasum = thetasum + thetasub
-    return (abs(thetasum))
+    return abs(thetasum)
 
 
 # Calculate bout angular velocity - this is interesting for potential seizures, but less so on a summarized fish level
@@ -156,96 +153,12 @@ def calculate_boutanglevel(bout_start, bout_end, thetas):
     peakanglevel = max(anglevelframe)
     return aveanglevel, peakanglevel
 
-
-# Calculate the preferences for the center vs edge for bouts and interbouts
-def calculate_socialfrac(bout_start, bout_end, interbout_start, interbout_end, xarr, fish_rois):
-    # THIS IS HARDCODED BASED ON OUR SOCIAL RIG AND WOULD NEED TO BE MODIFIED IF THE SHAPE OR SETUP CHANGED
-    # BASICALLY THE FISH ARE ON THE OUTSIDE, SO WE HAVE TO CONVERT THE XARR TO HAVE LARGE VALUES NEAR THE SOCIAL STIM ON ONE SIDE AND NOT THE OTHER
-    # print(xarr)
-    # could make this the halfway point of the image or something, but just going with a value I'm sure will work is ok until the code needs to be more flexible.
-    if fish_rois[0] < 400:
-        # the entire arrangement would need to change anyway if there were a change to the shape
-        maxrealx = np.amax(xarr)
-        zeroedgearr = xarr - maxrealx
-        zeroedgearr = -1 * zeroedgearr
-    else:
-        minrealx = np.amin(xarr)
-        zeroedgearr = xarr + abs(minrealx)
-# print("AFTER: ", zeroedgearr)
-# print("MIN: ",np.amin(zeroedgearr))
-# print("MAX: ",np.amax(zeroedgearr))
-    maxrealx = np.amax(zeroedgearr)
-    # deciding that zero is the farthest from stimulus fish
-    cqpt = maxrealx * 0.25
-    cqpttight = maxrealx * 0.10
-    qpt = maxrealx * 0.75
-    qpttight = maxrealx * 0.90
-    csmoments = 0  # moments near control
-    smoments = 0
-    csmomentstight = 0
-    smomentstight = 0
-    intersmoments = 0
-    tmoments = 0
-    intertmoments = 0
-    #socialfrac = 0.0
-    #socialfraccloser = 0.0
-    #intersocialfrac = 0.0
-    #avesocialfrac = 0.0
-    #interavesocialfrac = 0.0
-    totalx = 0.0
-    intertotalx = 0.0
-# print("Qpt: ",qpt)
-    for x3 in zeroedgearr[bout_start:(bout_end+1)]:
-        totalx = x3 + totalx
-        # print(totalx)
-        if x3 < cqpt:
-            csmoments = csmoments + 1
-        if x3 > qpt:
-            smoments = smoments + 1
-        if x3 < cqpttight:
-            csmomentstight = csmomentstight + 1
-        if x3 > qpttight:
-            smomentstight = smomentstight + 1
-        tmoments = tmoments + 1
-# print(smoments, tmoments)
-    csocialfrac = float(csmoments) / float(tmoments)
-    socialfrac = float(smoments) / float(tmoments)
-    csocialfraccloser = float(csmomentstight) / float(tmoments)
-    socialfraccloser = float(smomentstight) / float(tmoments)
-# print(totalx, float(totalx) / float(tmoments))
-    avesocialfrac = (float(totalx) / float(tmoments)) / float(maxrealx)
-    for x2 in zeroedgearr[interbout_start:(interbout_end+1)]:
-        intertotalx = x2 + intertotalx
-        if x2 > qpt:
-            intersmoments = intersmoments + 1
-        intertmoments = intertmoments + 1
-# # Only comes up if there is a bout at end of movie, because then the interbout_end and _start are the same and don't really exist
-# # None of this data will end up being analyzed though, because we ignore the last seconds usually anyway
-    if intertmoments != 0.0:
-        intersocialfrac = float(intersmoments) / float(intertmoments)
-        interavesocialfrac = (float(intertotalx) /
-                              float(intertmoments)) / float(maxrealx)
-    else:
-        intersocialfrac = 0.0
-        interavesocialfrac = 0.0
-    # socialfrac = fraction of the time in the positive zone, which is in the 1/4 point, during bouts
-    # intersocialfrac = fraction of the time in the positive zone, which is in the 1/4 point, during interbout time
-    # avesocialfrac = the ave x for each frame in the bout divided by the maximum x
-    # interavesocialfrac = the ave x for each frame in the interbout divided by the maximum x
-# print(socialfrac,avesocialfrac,intersocialfrac,interavesocialfrac)
-    return socialfrac, avesocialfrac, intersocialfrac, interavesocialfrac, socialfraccloser, csocialfrac, csocialfraccloser
-
-
 # Calculate the preferences for the center vs edge for bouts and interbouts
 def calculate_centerfrac(bout_start, bout_end, interbout_start, interbout_end, rhos, rhomax, halfpt):
     cmoments = 0
     intercmoments = 0
     tmoments = 0
     intertmoments = 0
-    #centerfrac = 0.0
-    #intercenterfrac = 0.0
-    #averhofrac = 0.0
-    #interaverhofrac = 0.0
     totalrho = 0.0
     intertotalrho = 0.0
     for r3 in rhos[bout_start:(bout_end+1)]:
@@ -300,7 +213,7 @@ def calculate_distance(fish):
     distances = np.zeros(np.shape(rhos), dtype=float)
     # at first the index the distance traveled is 0,0
     distances[0] = 0.0
-#    print("rho", len(rhos))
+
     for r in range(0, (len(rhos)-1)):
         if (rhos[r] - rhos[r+1] == 0.0) and (thetas[r] - thetas[r+1] == 0.0):
             distances[r+1] = 0.0
@@ -311,24 +224,11 @@ def calculate_distance(fish):
 
 
 # This function is where you would add in additional measures, if you want something new for slow-speed data
-def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_data_array, boutstarts, boutends, rhos, thetas, xarray, yarray, prefix="", rhothetadone=False):
+def calculate_bout_properties(fish_id, fish_rois, fish_distancesordpix, timestamp_data_array, boutstarts, boutends, rhos, thetas, xarray, yarray, prefix="", rhothetadone=False):
     # Constants needed
     rhomax = np.amax(rhos)
     halfpt = rhomax * 0.45  # this is what we are calling the halfpt
     unsignedthetas = thetas + np.pi
-
-    """
-    centerfracs = []
-    intercenterfracs = []
-    averhofracs = []
-    interaverhofracs = []
-
-    bouttimes = []
-    boutdistancesordpix = []
-    boutdisplacements = []
-    interbouttimes = []
-    """
-
     sleepbouts = []  # list of tuples for filtering waking activity
 
     boutpropertieswithpre = {}
@@ -354,28 +254,12 @@ def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_
         "interboutrhofraction": [],
         "boutcenterfraction": [],
         "interboutcenterfraction": [],
-        # "socialfrac": [],
-        # "csocialfrac": [],
-        # "csocialfraccloser": [],
-        # "socialfraccloser": [],
-        # "intersocialfrac": [],
-        # "avesocialfrac": [],
-        # "socialscore": [],
-        # "numberofboutssocial": [],
-        # "numberofboutsasocial": [],
-        # "socialpreference": [],
-        # "socialscorecloser": [],
-        # "interavesocialfrac": [],
         "numberofbouts": []
     }
 
-
-#    print(boutstarts)
     for b in range(0, len(boutstarts)):
         bout_start = boutstarts[b]
         bout_end = boutends[b]
-#        print("b", bout_start, bout_end)
-
         if bout_end < len(timestamp_data_array) and bout_start < len(timestamp_data_array):
             boutproperties["numberofbouts"].append(1)
             bouttime = (timestamp_data_array[boutends[b]] -
@@ -386,7 +270,7 @@ def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_
                 boutdistanceordpix = boutdistanceordpix + fish_distancesordpix[c]
             boutproperties["boutcumulativemovement"].append(boutdistanceordpix)
             # Speeds can be applicable to dpix data (vs. displacement is not) because cumdpix / time could be interesting
-            if (bouttime != 0):
+            if bouttime != 0:
                 boutproperties["boutspeed"].append(
                     float(boutdistanceordpix) / float(bouttime))
             else:
@@ -397,24 +281,14 @@ def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_
             if b != (len(boutstarts)-1):
                 interbout_end = boutstarts[b+1] - 1
             else:
-                # print("THEY ARE EQUAL")
                 interbout_end = np.shape(rhos)[0] - 1
         # Each bout also gets an interbout that follows it (even last one, goes until end of data)
         # So the number of items in every list passed back should be exactly the same
-        # print(interbout_start, interbout_end, bout_start, bout_end)
-        # print(len(timestamp_data_array))
-        # print(b, len(boutstarts)-1)
-        # print(timestamp_data_array[len(timestamp_data_array)-1])
-        # print(timestamp_data_array[interbout_start])
-        # print(timestamp_data_array[interbout_end])
-
-#            print(interbout_end, interbout_start)
-            #print(len(timestamp_data_array))
             if interbout_end < len(timestamp_data_array) and interbout_start < len(timestamp_data_array):
                 IBtime = (timestamp_data_array[interbout_end] -
                           timestamp_data_array[interbout_start]).total_seconds() * 1000
                 boutproperties["interbouttime"].append(IBtime)
-                if (IBtime != 0):
+                if IBtime != 0:
                     boutproperties["fracboutoverinterbout"].append(
                         float(bouttime) / float(IBtime))
                 else:
@@ -426,7 +300,7 @@ def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_
                     boutproperties["numberofboutsSLEEP"].append(0)
                 # The call of this function that is done second (the dpix one) will already have completed this and the lists will be empty
                 # This approach will fail if someone switches order they call the dpix and distance analyses
-                if (rhothetadone == False):
+                if not rhothetadone:
                     boutdisplacement = polar_to_distance(
                         rhos[bout_start], rhos[bout_end], thetas[bout_start], thetas[bout_end])
                     boutproperties["boutdisplacement"].append(boutdisplacement)
@@ -437,17 +311,13 @@ def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_
                     boutproperties["boutaveangvelocity"].append(aveanglevel)
                     boutproperties["boutpeakangvelocity"].append(peakanglevel)
                     boutrev = calculate_boutrev(
-                        bout_start, bout_end, unsignedthetas, rhos)
+                        bout_start, bout_end, unsignedthetas)
                     boutproperties["boutrevolutions"].append(boutrev)
-                    # print("TESTING0")
-
-                    # if ((boutrev > 4.0) and (0.3 < (bouttime / boutdistanceordpix) < 1.3) and (boutdistanceordpix > 70)):
-                    if ((boutrev > fileloading.seizurefilters[0]) and ((float(boutdistanceordpix) / float(bouttime)) > fileloading.seizurefilters[1]) and (float(boutdistanceordpix) > fileloading.seizurefilters[3])):
+                    if (boutrev > fileloading.seizurefilters[0]) and ((float(boutdistanceordpix) / float(bouttime)) > fileloading.seizurefilters[1]) and (float(boutdistanceordpix) > fileloading.seizurefilters[3]):
                         boutproperties["boutseizurecount"].append(1)
-                    # print("TESTING1", bout_start, bout_end, boutrev, (float(boutdistanceordpix) / float(bouttime)), (float(boutdistanceordpix)))
                     else:
                         boutproperties["boutseizurecount"].append(0)
-                    sumheading, sumabsheading, initialdirection = HeadingAngle(
+                    sumheading, sumabsheading, initialdirection = heading_angle(
                         xarray, yarray, bout_start, bout_end)
                     boutproperties["boutsumheadingangle"].append(sumheading)
                     boutproperties["boutsumabsheadingangle"].append(sumabsheading)
@@ -459,34 +329,12 @@ def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_
                     boutproperties["interboutrhofraction"].append(interaverhofrac)
                     boutproperties["boutcenterfraction"].append(centerfrac)
                     boutproperties["interboutcenterfraction"].append(intercenterfrac)
-            # if(fileloading.social): # THIS SECTION IS NOT WORKING AFTER I IMPLEMENTED THE FRAME THINGS
-            # socialfrac,avesocialfrac,intersocialfrac,interavesocialfrac,socialfraccloser,csocialfrac,csocialfraccloser = calculate_socialfrac(bout_start, bout_end, interbout_start, interbout_end, xarray, fish_rois)
-            # boutproperties["socialfrac"].append(socialfrac)
-            # boutproperties["csocialfrac"].append(csocialfrac)
-            # boutproperties["socialfraccloser"].append(socialfraccloser)
-            # boutproperties["csocialfraccloser"].append(csocialfraccloser)
-            # boutproperties["intersocialfrac"].append(intersocialfrac)
-            # boutproperties["avesocialfrac"].append(avesocialfrac)
-            # boutproperties["interavesocialfrac"].append(interavesocialfrac)
-            # boutproperties["socialscore"].append(float(socialfrac) - float(csocialfrac))
-            # boutproperties["socialscorecloser"].append(float(socialfraccloser) - float(csocialfraccloser))
-            # print("SOCIAL SCORES: ", socialfrac, csocialfrac, socialfraccloser, csocialfraccloser, avesocialfrac)
-            # most bouts are one or the other, not a mixture
-            # if (socialfrac > 0.79):
-            # boutproperties["numberofboutssocial"].append(1)
-            # else:
-            # boutproperties["numberofboutssocial"].append(0)
-            # if (csocialfrac > 0.79):
-            # boutproperties["numberofboutsasocial"].append(1)
-            # else:
-            # boutproperties["numberofboutsasocial"].append(0)
-            # Seems not likely that you would want to filter without real measurements from distance
-                    if (fileloading.outputmovies):
-                # print("TESTING2", fish_id, bout_start, bout_end)
-                # PUT IN MOVIE FILTERS AND GET ALL OF THESE FUNCTION INPUTS
-                # "boutseizurecount"
-                # get value that was just added to the end of the list and compare to the input filter
-                        if (opsP[fileloading.moviefilter[1].split(":")[0]](boutproperties[fileloading.moviefilter[1].split(":")[1]][len(boutproperties[fileloading.moviefilter[1].split(":")[1]])-1], int(fileloading.moviefilter[0]))):
+
+                    # Seems not likely that you would want to filter without real measurements from distance
+                    if fileloading.outputmovies:
+                        # PUT IN MOVIE FILTERS AND GET ALL OF THESE FUNCTION INPUTS
+                        # get value that was just added to the end of the list and compare to the input filter
+                        if opsP[fileloading.moviefilter[1].split(":")[0]](boutproperties[fileloading.moviefilter[1].split(":")[1]][len(boutproperties[fileloading.moviefilter[1].split(":")[1]]) - 1], int(fileloading.moviefilter[0])):
                             save_movie(fish_id, fish_rois, bout_start, bout_end)
     for k in boutproperties.keys():
         boutpropertieswithpre[prefix + k] = boutproperties[k]
@@ -494,12 +342,9 @@ def CalculateBoutProperties(fish_id, fish_rois, fish_distancesordpix, timestamp_
 
 
 # Identify bouts, including not counting if there is noise of a single frame below threshold and filtering by number of frames in bout
-def findBoutIndices(fish_distances, threshold, frames):
+def find_bout_indices(fish_distances, threshold, frames):
     boutstarts = []
-    boutstarts2 = []
-    realboutstarts = []
     boutends = []
-    realboutends = []
     laststart = -1
     finallaststart = -1
     for d in range(0, len(fish_distances)-1):
@@ -508,7 +353,7 @@ def findBoutIndices(fish_distances, threshold, frames):
         if (fish_distances[d] >= threshold) and (laststart == -1):
             laststart = d
             finallaststart = d
-        elif (laststart != -1):
+        elif laststart != -1:
             if fish_distances[d] < threshold and fish_distances[d+1] < threshold:
                 if ((d-1) - laststart) >= frames:
                     boutstarts.append(laststart)
@@ -538,16 +383,16 @@ def identify_event_bout(dpix_movement, approximate_frames, threshold, frame_thre
                 earlybout = True
     # If fish is moving before they are supposed to based on the frame
     # In theory this could be wrong and lose data if you have a dramatically shortened response latency or have not optimized frame choices vs frame rate of camera
-    if earlybout == True:
+    if earlybout:
         # FUTURE: could also rework to find ALL "bouts" in the movies and then align with the start in the frames of interest (could also fuse if there are issues with broken bouts)
         # Let's keep it like this, but still keep the frame and intensity threshold for identifying bouts so we aren't tossing out fish who just shifted a tiny bit
-        return (np.nan, np.nan)
+        return np.nan, np.nan
     else:
         for d in range(0, len(approximate_frames)):
             if dpix_movement[approximate_frames[d]] >= threshold:
                 bout_start_fr = approximate_frames[d]
                 break
-        if highspeed == True:
+        if highspeed:
             # -4 seems arbitrary, this is just for any issues at end of movie or changing intensities?
             for b in range(bout_start_fr, len(dpix_movement) - 4):
                 if b == 0:
@@ -558,9 +403,9 @@ def identify_event_bout(dpix_movement, approximate_frames, threshold, frame_thre
                     break
                 bout_end_fr = b - 1  # NEED THIS IN CASE THE BOUT STARTS AND THEN WE DONT HAVE ENOUGH FRAMES TO FINISH IT, SO YOU DONT END UP WITH END BEING BEFORE START
             if bout_end_fr - bout_start_fr > frame_threshold:
-                return (bout_start_fr, bout_end_fr)
+                return bout_start_fr, bout_end_fr
             else:
-                return (0, 0)
+                return 0, 0
         else:  # NOT SURE HOW WELL THE HIGH-SPEED WORKS FOR CHECKING THE MOVING FRAMES . . . SEEMS LIKE NOT WELL, NON-HIGHSPEED DATA IS NOT REALLY WORTH LOOKING AT
             # This is legacy code, in the off-chance people want to look at responses on data that is a low FPS . . . not advisable
             for b2 in range(bout_start_fr, approximate_frames[-1] + len(approximate_frames)):
@@ -571,10 +416,10 @@ def identify_event_bout(dpix_movement, approximate_frames, threshold, frame_thre
                     break
                 bout_end_fr = b2 - 1  # NEED THIS IN CASE THE BOUT STARTS AND THEN WE DONT HAVE ENOUGH FRAMES TO FINISH IT, SO YOU DONT END UP WITH END BEING BEFORE START
             # bout_start_fr = bout_start_fr - 1 # Need this to help keep distance bouts that are only a single frame, no longer need it though if basing all on dpix - legacy code
-            return (bout_start_fr, bout_end_fr)
+            return bout_start_fr, bout_end_fr
 
 
-def CalculateEventProperties(name, eventsection, hs_dict, hs_distances, threshold, frame_threshold, hs_pos_x, hs_pos_y):
+def calculate_event_properties(name, eventsection, hs_dict, hs_distances, threshold, frame_threshold, hs_pos_x, hs_pos_y):
     binnedlist = []
     # The keys for the event defines the kind of event (i.e. the info in teensy string)
     for event in eventsection.keys():
@@ -601,24 +446,24 @@ def CalculateEventProperties(name, eventsection, hs_dict, hs_distances, threshol
         # THIS IS PROBABLY SILLY, COULD JUST DO THE ENTIRE 285 FRAMES AND VIEW THAT
         endframe = approximate_frames[-1] + 14
         # This is the code for the teensy to say high-speed movie
-        if (event.split("_")[0] != "1"):
+        if event.split("_")[0] != "1":
             continue
         for eventtime in eventsection[event]:  # time key used in hs_distances
             # Bout are identified only on dpix data, not on distance data, but then the frames of the dpix responses are used to calculate the distance information
             # COULD UPDATE THIS FXN TO BE BETTER, LIKE THE SLOW-SPEED ONE, BUT NOT RIGHT NOW
             (dpix_bout_start, dpix_bout_end) = identify_event_bout(
                 hs_dict[eventtime], approximate_frames, threshold, frame_threshold)
-            if (np.isnan(dpix_bout_end) or np.isnan(dpix_bout_start)):
+            if np.isnan(dpix_bout_end) or np.isnan(dpix_bout_start):
                 for k, vlist in responseproperties.items():
-                    if ("responsefull" in k):
+                    if "responsefull" in k:
                         vlist.append(np.full((endframe-startframe), np.nan))
                     else:
                         vlist.append(np.nan)
-            elif (dpix_bout_start == 0 and dpix_bout_end == 0):
+            elif dpix_bout_start == 0 and dpix_bout_end == 0:
                 for k2, vlist2 in responseproperties.items():
-                    if ("responsefull" in k2):
+                    if "responsefull" in k2:
                         vlist2.append(np.full((endframe-startframe), np.nan))
-                    elif ("frequency" in k2):
+                    elif "frequency" in k2:
                         vlist2.append(0)
                     else:
                         vlist2.append(np.nan)
@@ -632,10 +477,10 @@ def CalculateEventProperties(name, eventsection, hs_dict, hs_distances, threshol
                 bout_disp = cart_to_distance(hs_pos_x[eventtime][dpix_bout_start], hs_pos_x[eventtime]
                                              [dpix_bout_end], hs_pos_y[eventtime][dpix_bout_start], hs_pos_y[eventtime][dpix_bout_end])
                 responseproperties["responsedisplacement"].append(bout_disp)
-                responseproperties["responsepolygonarea"].append(PolyArea(
+                responseproperties["responsepolygonarea"].append(poly_area(
                     hs_pos_x[eventtime][dpix_bout_start:dpix_bout_end], hs_pos_y[eventtime][dpix_bout_start:dpix_bout_end]))
-                sumHA, sumabsHA, initdirHA = HeadingAngle(
-                    hs_pos_x[eventtime], hs_pos_y[eventtime], dpix_bout_start, dpix_bout_end, True)
+                sumHA, sumabsHA, initdirHA = heading_angle(
+                    hs_pos_x[eventtime], hs_pos_y[eventtime], dpix_bout_start, dpix_bout_end)
                 responseproperties["responsesumheadingangle"].append(sumHA)
                 responseproperties["responsesumabsheadingangle"].append(
                     sumabsHA)
@@ -671,7 +516,7 @@ def CalculateEventProperties(name, eventsection, hs_dict, hs_distances, threshol
         for k3, v3 in responseproperties.items():
             if len(v3) == 0:
                 continue
-            if ("responsefull" in k3):
+            if "responsefull" in k3:
                 binnedlist.append(ProcessedData(
                     k3, np.nanmean(v3, axis=0), (event,), name))
             else:
@@ -682,23 +527,16 @@ def CalculateEventProperties(name, eventsection, hs_dict, hs_distances, threshol
 # Finding the index values of various chunks of time we are analyzing for movement
 # Called by activity_time_data
 def determine_indices(timestamp_data_array, timeinterval, timestart, timeend, timestamp_data_dict, dropped_seconds):
-    indexstart = 0
-    indexend = 0
     tdelta = timeend - timestart  # The total possible experiment time
     # How many different chunks of time to break it into (ie, 10 minutes in active minutes per 10 minutes)
     intervalnumber = int(tdelta.total_seconds()) / timeinterval
     # The index value for the first occurrence of the start time, so this is the inclusive value
     indexstart = timestamp_data_dict[timestart]
-# print(indexstart)
-#    indexstart = 0
     # The index value for the last occurrence of the end time, so this is the inclusive value
     indexend = len(timestamp_data_array)
-# print(indexend)
-    intervalindices = []
-    intervalindices.append(indexstart)
+    intervalindices = [indexstart]
     timetest = timestart
-# print(timetest)
-    timestamp_data_dict_keys = timestamp_data_dict.keys()
+
     if timeinterval >= 1:
         for z2 in range(0, int(intervalnumber)):
             z2 = z2+1
@@ -707,7 +545,6 @@ def determine_indices(timestamp_data_array, timeinterval, timestart, timeend, ti
             if timetest1 not in dropped_seconds:
                 try:
                    indext = timestamp_data_dict[timetest1]
-                   # print("INDEXT",indext)
                    intervalindices.append(indext-1)
                    intervalindices.append(indext)
                 except Exception as e:
@@ -737,7 +574,6 @@ def sleep(data_array, threshold, sleepbouts, intervalindices1, intervalindices36
     binnedlist = []
     for m in range(0, len(intervalindices3600)-1, 2):
         activetime = 0
-        printdata = []
         startindex1 = np.searchsorted(intervalindices1, intervalindices3600[m])
         # Add one because range below is non-inclusive
         endindex1 = np.searchsorted(
@@ -748,7 +584,7 @@ def sleep(data_array, threshold, sleepbouts, intervalindices1, intervalindices36
             for m4 in range(shortarray1[m3], shortarray1[m3+1]+1):
                 if data_array[m4] > threshold:
                     activetimebool = True
-                if activetimebool == True:
+                if activetimebool:
                     activetime = activetime + 1
                     break
         activitydict[prefix + "wakingactive"].append(activetime)
@@ -756,131 +592,25 @@ def sleep(data_array, threshold, sleepbouts, intervalindices1, intervalindices36
         binnedlist.append(ProcessedData(k2, v2, ("1", "3600")))
     return binnedlist
 
-
-def socialactivityb(x_array, rois, intervalnumindices, intervalindices, timebintup, prefix=""):
-    activitydict = {
-        prefix + "socialpreferenceframesb": []
-    }
-    binnedlist = []
-    qpt = rois[2]*0.75  # maxx
-    cqpt = rois[2]*0.25
-    for m in range(0, len(intervalindices)-1, 2):
-        # sframes = 0
-        # asframes = 0
-        socialpreferenceindex = 0
-        printdata = []
-        startindex = np.searchsorted(intervalnumindices, intervalindices[m])
-        # Add one because range below is non-inclusive
-        endindex = np.searchsorted(
-            intervalnumindices, intervalindices[m+1]) + 1
-        shortarray = intervalnumindices[startindex:endindex]
-        # print("INDEXCHECK ",startindex, endindex)
-        # print("INDEXCHECK ",shortarray)
-        sframes = 0
-        asframes = 0
-        tframes = 0
-        socialpreference = 0
-        for m3 in range(0, len(shortarray)-1, 2):
-            # print("TESTY",m3)
-            # sframes = 0
-            # asframes = 0
-            # tframes = 0
-            # socialpreference = 0
-            for m4 in range(shortarray[m3], shortarray[m3+1]+1):
-                # print("TESTZ",m4)
-                # print("TESTX",x_array[m4])
-                tframes = tframes + 1
-                if x_array[m4] > qpt:
-                    sframes = sframes + 1
-                if x_array[m4] < qpt:
-                    asframes = asframes + 1
-        socialpreference = (sframes - asframes) / tframes
-        # print("soc: ", socialpreference)
-        # if socialpreference > 0:
-        # socialpreferenceindex = socialpreferenceindex + 1
-        # print(sframes, asframes, tframes)
-        activitydict[prefix +
-                     "socialpreferenceframesb"].append(socialpreference)
-    for k2, v2 in activitydict.items():
-        binnedlist.append(ProcessedData(k2, v2, timebintup))
-    return binnedlist
-
-
-def socialactivity(x_array, rois, intervalnumindices, intervalindices, timebintup, prefix=""):
-    activitydict = {
-        prefix + "socialpreferenceframes": []
-    }
-    binnedlist = []
-    qpt = rois[2]*0.75  # maxx
-    cqpt = rois[2]*0.25
-    for m in range(0, len(intervalindices)-1, 2):
-        # sframes = 0
-        # asframes = 0
-        socialpreferenceindex = 0
-        printdata = []
-        startindex = np.searchsorted(intervalnumindices, intervalindices[m])
-        # Add one because range below is non-inclusive
-        endindex = np.searchsorted(
-            intervalnumindices, intervalindices[m+1]) + 1
-        shortarray = intervalnumindices[startindex:endindex]
-        # print("INDEXCHECK ",startindex, endindex)
-        # print("INDEXCHECK ",shortarray)
-        sframes = 0
-        asframes = 0
-        tframes = 0
-        socialpreference = 0
-        for m3 in range(0, len(shortarray)-1, 2):
-            # print("TESTY",m3)
-            # sframes = 0
-            # asframes = 0
-            # tframes = 0
-            # socialpreference = 0
-            for m4 in range(shortarray[m3], shortarray[m3+1]+1):
-                # print("TESTZ",m4)
-                # print("TESTX",x_array[m4])
-                tframes = tframes + 1
-                if m4 < len(x_array):
-                    if x_array[m4] > qpt:
-                        sframes = sframes + 1
-                    if x_array[m4] < cqpt:
-                        asframes = asframes + 1
-        socialpreference = (sframes - asframes) / tframes
-        # print("soc: ", socialpreference)
-        # if socialpreference > 0:
-        # socialpreferenceindex = socialpreferenceindex + 1
-        # print(sframes, asframes, tframes)
-        activitydict[prefix +
-                     "socialpreferenceframes"].append(socialpreference)
-    for k2, v2 in activitydict.items():
-        binnedlist.append(ProcessedData(k2, v2, timebintup))
-    return binnedlist
-
-
 def flexactivity(data_array, threshold, intervalnumindices, intervalindices, timebintup, prefix=""):
-#    print(data_array.shape)
     activitydict = {
         prefix + "active": []
     }
-#    print(intervalnumindices, intervalindices, timebintup)
     binnedlist = []
     for m in range(0, len(intervalindices)-1, 2):
         activetime = 0
-        printdata = []
         startindex = np.searchsorted(intervalnumindices, intervalindices[m])
         # Add one because range below is non-inclusive
         endindex = np.searchsorted(
             intervalnumindices, intervalindices[m+1]) + 1
-#        print(startindex, endindex)
         shortarray = intervalnumindices[startindex:endindex]
         for m3 in range(0, len(shortarray)-1, 2):
             activetimebool = False
-#            print(m3)
             for m4 in range(shortarray[m3], shortarray[m3+1]+1):
-#                print(m4)
                 if m4 < len(data_array):
                     if data_array[m4] > threshold:
                         activetimebool = True
-                    if activetimebool == True:
+                    if activetimebool:
                         activetime = activetime + 1
                         break
         activitydict[prefix + "active"].append(activetime)
@@ -912,7 +642,7 @@ def bout_flexactivity(boutproperties, bout_startsl0, intervalindices0, timebin):
                 datadict[k].append(np.sum(shortlist))
             # Persistence or % in same direction
             elif "initdirectionheadingangle" in k:
-                if (np.count_nonzero(~np.isnan(shortlist)) > 0):
+                if np.count_nonzero(~np.isnan(shortlist)) > 0:
                     per_clock = float(np.count_nonzero(~np.isnan(
                         shortlist[shortlist > 0]))) / float(np.count_nonzero(~np.isnan(shortlist)))
                     per_cclock = float(np.count_nonzero(~np.isnan(
@@ -925,23 +655,16 @@ def bout_flexactivity(boutproperties, bout_startsl0, intervalindices0, timebin):
                     datadict[k].append(np.nan)
             else:
                 datadict[k].append(np.nanmean(shortlist))
-        if (fileloading.social):
+        if fileloading.social:
             if "socialpreference" in datadict.keys() and "dpix" not in datadict.keys():
                 # should just get the item that was just summed
                 datadict["socialpreference"].append(
                     (datadict["numberofboutssocial"][-1] - datadict["numberofboutsasocial"][-1])/datadict["numberofbouts"][-1])
-            # print("TEST",datadict["numberofboutssocial"][-1] - datadict["numberofboutsasocial"][-1])
-            # print("TEST2",datadictdatadict["numberofbouts"][-1])
-            # print("TEST3",(datadict["numberofboutssocial"][-1] - datadict["numberofboutsasocial"][-1])/datadict["numberofbouts"][-1]) # should just get the item that was just summed
-    # if(fileloading.social):
-    # if "socialpreference" in datadict.keys() and "dpix" not in datadict.keys():
-    # datadict["socialpreference"] = [x for x in datadict["socialpreference"] if not math.isnan(x)]
 
     for k2, v2 in datadict.items():
-        print("KV", k2, v2)
-        if (len(v2) == 0):
+        if len(v2) == 0:
             continue
-        if (np.isnan(v2).all()):
+        if np.isnan(v2).all():
             continue
         binnedlist.append(ProcessedData(k2, v2, (timebin,)))
     return binnedlist
@@ -955,39 +678,26 @@ def process_all_data():
     # Load in all the data through the fileloading.py script
     (fish_list, timestamp_data_array, timestamp_data_dict,
      dropped_seconds, eventsectionlist) = fileloading.loading_procedures()
-    all_fish_bouts = {}
-    dpix_all_fish_bouts = {}
-    print(timestamp_data_array[0].microsecond)
-#    print(timestamp_data_array)
-#    print(timestamp_data_dict)
     # Obtain indices for the binning used to analyze bouts and also activity (classic sleep plots) data
     timestart = timestamp_data_array[0]
     timeend = timestamp_data_array[len(timestamp_data_array)-1]
-    print("ptime", timestart, timeend)
     allbins = fileloading.activitytimes + fileloading.boutbins
     allbinsset = set(allbins)
     indexdict = {}
-    print("allbinsset", allbinsset)
     for t in allbinsset:
- #       print(t)
         binindices = determine_indices(timestamp_data_array, int(
             t), timestart, timeend, timestamp_data_dict, dropped_seconds)
- #       print(binindices)
         indexdict[str(t)] = binindices
         # Adding the start and end indices for all possible binning for every eventsection, even if you don't need every single one (the numerator bins aren't used)
         for es1 in eventsectionlist:
-            print(es1.starttime, es1.endtime)
             indstart, indend = find_indices(
                 es1.starttime, es1.endtime, timestamp_data_dict, binindices)
             es1.add_indices(t, indstart, indend)
     # Finding the bouts, both with distance and dpix, for each fish
     for fish in fish_list:
         print("FISH: ", fish.idnumber)
-        if (fileloading.social):
-            fish_distances = calculate_distance(fish)
+        if fileloading.social:
             for r in range(0, len(fileloading.activitytimes)-1, 2):
-                # print(str(fileloading.activitytimes[r]))
-                # print(str(fileloading.activitytimes[r+1]))
                 tup_time = (str(fileloading.activitytimes[r]), str(
                     fileloading.activitytimes[r+1]))
                 # fish.add_binned_data(flexactivity(fish_distances, fileloading.activitytimesthresholds[0], indexdict[str(fileloading.activitytimes[r])],indexdict[str(fileloading.activitytimes[r+1])], tup_time))
@@ -997,20 +707,16 @@ def process_all_data():
         # continue # if we are doing social, we are going to skip bout stuff, since it really doesn't work well (even though we have a function still, deciding it wasn't ideal). The challenge is in bout definitions for 21 dpf partly.
         # Calculating the distances moved between each frame for both slow-speed data and high-speed movies
         fish_distances = calculate_distance(fish)
-#        print(fish_distances[fish_distances>0])
         hs_fish_distances = hs_calculate_distance(fish)
-        boutstarts, boutends = findBoutIndices(
+        boutstarts, boutends = find_bout_indices(
             fish_distances, fileloading.thresholdvalues[0], fileloading.thresholdframes[0])
-#        print(boutstarts, boutends)
-        boutproperties, sleepbouts = CalculateBoutProperties(
+        boutproperties, sleepbouts = calculate_bout_properties(
             fish.idnumber, fish.rois, fish_distances, timestamp_data_array, boutstarts, boutends, fish.rho_array, fish.theta_array, fish.x_array, fish.y_array)
-#        print(boutproperties)
-        dboutstarts, dboutends = findBoutIndices(
+        dboutstarts, dboutends = find_bout_indices(
             fish.dpix, fileloading.thresholdvalues[1], fileloading.thresholdframes[1])
         # The "True" indicates that the well center and rho data (and displacement) is already done, and those lists will return as empty
-        dboutproperties, dsleepbouts = CalculateBoutProperties(
+        dboutproperties, dsleepbouts = calculate_bout_properties(
             fish.idnumber, fish.rois, fish.dpix, timestamp_data_array, dboutstarts, dboutends, fish.rho_array, fish.theta_array, fish.x_array, fish.y_array, "dpix_", True)
-#        print(dboutproperties, dsleepbouts)
         # continue # UPDATE TO DOING SOCIAL, TRYING OTHER INDICES
         # Processed data object, with access to binned_time((tuple that can be 2 or 1)), data itself, name, and then will add the graphing parameters to it (x-axis, y-axis), high-speed or slow-speed (default)
         # Fish contain a list of Processed data objects
@@ -1020,8 +726,6 @@ def process_all_data():
         # fish.add_binned_data(sleep(fish_distances.copy(), fileloading.activitytimesthresholds[0], sleepbouts, indexdict["1"], indexdict["3600"]))
         # fish.add_binned_data(sleep(fish.dpix.copy().astype(float), fileloading.activitytimesthresholds[1], dsleepbouts, indexdict["1"], indexdict["3600"], "dpix_"))
         for timebin in fileloading.boutbins:
-#            print(timebin)
-#            print(bout_flexactivity(boutproperties, boutstarts, indexdict[str(timebin)], str(timebin)))
             fish.add_binned_data(bout_flexactivity(
                 boutproperties, boutstarts, indexdict[str(timebin)], str(timebin)))
             fish.add_binned_data(bout_flexactivity(
@@ -1035,7 +739,7 @@ def process_all_data():
                 fileloading.activitytimes[r])], indexdict[str(fileloading.activitytimes[r+1])], tup_time, "dpix_"))
         for es2 in eventsectionlist:
             if es2.type != "time":
-                fish.add_binned_data(CalculateEventProperties(es2.name, es2.events, fish.hs_dict, hs_fish_distances,
+                fish.add_binned_data(calculate_event_properties(es2.name, es2.events, fish.hs_dict, hs_fish_distances,
                                      fileloading.hsthresholdvalues[1], fileloading.hsthresholdframes[1], fish.hs_pos_x, fish.hs_pos_y))
     # pr.disable()
     # pr.print_stats(sort='time')
@@ -1044,14 +748,10 @@ def process_all_data():
 
 # Start here
 fileloading.initialize_args()
-if (fileloading.graphonly):
+if fileloading.graphonly:
     print("Skipping fresh run and graphing based on current working directory")
     graphsstatsandfilter.main(fileloading.graphparameters, fileloading.lightbaseline,
                               fileloading.obendfilter, fileloading.cbendfilter)
-elif (fileloading.graphmulti):
-    print("Skipping fresh run and graphing based on multiple directories")
-    graphsstatsandfilter.main(fileloading.graphparameters, fileloading.lightbaseline,
-                              fileloading.obendfilter, fileloading.cbendfilter, fileloading.graphmulti)
 else:
     print("Processing motion data from start")
     eventsectionlist, fish_list = process_all_data()

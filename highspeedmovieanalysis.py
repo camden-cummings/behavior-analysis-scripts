@@ -1,4 +1,3 @@
-#!/usr/bin/python 
 """
 highspeedmovieanalysis.py
 
@@ -18,7 +17,7 @@ Arguments
 -longmovie: Argument for analyzing movies longer than a second. Produces a timestamp file with timepoints for each frame.
 -ml: The length of the movie in seconds
 
-Outputs
+File outputs
 -------
 Motion data file (.motion2)
 Centroid data file (.centroid2)
@@ -27,45 +26,50 @@ Last frame PNG image with ROI numbering
 Tracked lines PNG image
 Mode PNG image
 timestamp file (only for long movies)
- 
-"""
 
-import argparse
-import datetime
-import glob
-import math
-import os
-import pickle
+"""
 
 import numpy as np
 import cv2
+from contourpy.array import concat_points_or_none
 from matplotlib.pyplot import imread
+import argparse
 from scipy.stats import mode
+import math
 from PIL import Image, ImageFont, ImageDraw
+import pickle
+import datetime
+import re
+import glob
 
 parser = argparse.ArgumentParser(description='loading for fish behavior files')
 parser.add_argument('-r', type=str, action="store", dest="roisfile")
 parser.add_argument('-m', type=str, action="store", dest="moviefile")
 parser.add_argument('-e', type=str, action="store", dest="eventsfile", default=False)
-parser.add_argument('-p', type=str, action="store", dest="pixThreshold", default="3,7")
+parser.add_argument('-p', type=str, action="store", dest="pix_threshold", default="3,7")
 parser.add_argument('-f', type=int, action="store", dest="frameRate", default=285)
 parser.add_argument('-fd', type=str, action="store", dest="frameDimensions", default="660,1088")
+parser.add_argument('-a', type=int, action="store", dest="framesplit", default=3)
+parser.add_argument('-b', type=int, action="store", dest="modesplit", default=6)
 parser.add_argument('-s', type=int, action="store", dest="savefrequency", default=4500)
 parser.add_argument('-longmovie', action="store_true", dest="longmovie", default=False)
-parser.add_argument('-ml', type=int, action="store", dest="movielength", default=1) #in seconds
+parser.add_argument('-ml', type=int, action="store", dest="movielength", default=1)  # in seconds
 
 args = parser.parse_args()
-roisfile = args.roisfile
+rois_file = args.roisfile
 ydim = list(map(int, args.frameDimensions.split(',')))[0]
 xdim = list(map(int, args.frameDimensions.split(',')))[1]
 videoStream = args.moviefile
 eventsfile = args.eventsfile
-pixThreshold = list(map(int, args.pixThreshold.split(',')))
-frameRate = args.frameRate
-saveFreq = args.savefrequency
-longmovie = args.longmovie
+pix_threshold = list(map(int, args.pixThreshold.split(',')))
+frame_rate = args.frameRate
+frame_split = args.framesplit
+mode_split = args.modesplit  # how many sections to split the movie into for mode generation
+save_freq = args.savefrequency
+long_movie = args.longmovie
 movlen = args.movielength
 filenumber = videoStream.split('/')[-1].split('.')[0].split('-')[1]
+
 
 def calc_mode(deq, nump_arr):
     """
@@ -84,152 +88,135 @@ def calc_mode(deq, nump_arr):
        Mode image
 
     """
-    for j,k in enumerate(nump_arr[:,0]): 
-        nump_arr[j,:] = mode(np.array([x[j,:] for x in deq]))[0]
+    for j, k in enumerate(nump_arr[:, 0]):
+        nump_arr[j, :] = mode(np.array([x[j, :] for x in deq]))[0]
     return nump_arr
 
-def imageMode(modename,movielist=[1]):
+
+def image_mode_LM(modename, frames):
     """
-    This function uses the calcMode function to obtain the mode image. 
+    This function uses the calcMode function to obtain the mode image.
     It then writes the image as a PNG to be viewed later.
 
-    Parameters 
+    Parameters
+    ---------
+    frames: list
+        A list containing a set of frames to use for the mode
+    modename: string
+        A string specifying the range of frames used to create mode image.
+        For instance, 1to30 would be the name for movies 1 through 30.
+
+    """
+
+    cap = cv2.VideoCapture(videoStream)
+    moviedeq = []
+    for f in frames:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, f)
+        ret, frame = cap.read()
+        stored_frame = gray_blur(frame)
+        moviedeq.append(stored_frame)
+    testing = calc_mode(moviedeq, np.zeros([ydim, xdim]))
+    cv2.imwrite("mode_" + modename + ".png", testing)
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+def image_mode(modename, movielist=[1]):
+    """
+    This function uses the calcMode function to obtain the mode image.
+    It then writes the image as a PNG to be viewed later.
+
+    Parameters
     ---------
     movielist: list
         A list containing a set of ~30 movie numbers
     modename: string
         A string specifying the range of movies used to create mode image.
         For instance, 1to30 would be the name for movies 1 through 30.
-
-    Outputs
-    -------
-    Mode PNG image for each range of 30 images
-
     """
 
-    fp = "/".join(videoStream.split('/')[:-1])
     moviedeq = []
-    i2 = 0    
+    i2 = 0
+    fp = "/".join(videoStream.split('/')[:-1])
     for filenumber in movielist:
-        cap = cv2.VideoCapture(f"{fp}/{filenumber}.avi")
-        ret,frame = cap.read()
-        storedFrame = grayBlur(frame)
-        totalFrames = 0
-        while(cap.isOpened()):
-            ret,frame = cap.read()
-            if ret == False:
-                break
-            currentFrame = grayBlur(frame)
-            if totalFrames < 50:
-                if totalFrames % 3 == 0:
-                    moviedeq.append(currentFrame)
-            totalFrames += 1
-            storedFrame = currentFrame 
-        i2 += 1
-    testing = calc_mode(moviedeq, np.zeros([ydim,xdim]))
+        fn = glob.glob(f"{fp}/*-{filenumber}.avi")
+        if len(fn) > 0:
+            fn = fn[0]
+            cap = cv2.VideoCapture(fn)
+            total_frames = 0
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                curr_frame = gray_blur(frame)
+                if total_frames < 50:
+                    if total_frames % frame_split == 0:
+                        moviedeq.append(curr_frame)
+                total_frames += 1
+            i2 += 1
+    testing = calc_mode(moviedeq, np.zeros([ydim, xdim]))
     cv2.imwrite("mode_" + modename + ".png", testing)
     cap.release()
     cv2.destroyAllWindows()
 
-def calc_mode(deq: np.ndarray, frame_height: int, frame_width: int):
-    """Finds a mode image based on a given array of images, effectively creating a background
-    image."""
-    mode_img = np.zeros([frame_height, frame_width])
 
-    for j, _ in enumerate(mode_img[:, 0]):
-        mode_img[j, :] = mode(np.array([x[j, :] for x in deq]))[0]
-
-    mode_img, _ = np.array(mode(deq, axis=0), dtype=np.uint8)
-    
-    return mode_img
-
-
-def calc_mode_img(vidcap, frame_width: int, frame_height: int, filename: str, blur: bool): 
-    """Calculates mode image based on all images in video, creating a version of the image with."""
-    moviedeq = []
-    cont, frame = vidcap.read()
-    curr_frame = 0
-
-    while cont:
-        curr_frame += int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT) / 50)
-
-        vidcap.set(cv2.CAP_PROP_POS_FRAMES, curr_frame)
-
-        cont, frame = vidcap.read()
-
-        if not cont:
-            break
-
-        if blur:
-            stored_frame = cv2.GaussianBlur(
-                cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (7, 7), 0)
-        else:
-            stored_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        moviedeq.append(stored_frame)
-
-    mode_img = calc_mode(moviedeq, frame_height, frame_width)
-    cv2.imwrite(filename, mode_img)
-
-    _ = vidcap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-
-    return mode_img
-
-def diffImage(storedFrame,currentFrame,pixThreshold):
+def diff_image(stored_frame, curr_frame, pix_threshold):
     """
     This function finds the pixel difference between the current frame and
     the previous frame. It then normalizes the image pixel values by dividing by 255
 
     Parameters
     ---------
-    storedFrame: ndarray
+    stored_frame: ndarray
         Previous frame that has been blurred by the grayBlur function.
-    currentFrame: ndarray
+    curr_frame: ndarray
         The current frame; blurred using the grayBlur function.
-    pixThreshold: int
+    pix_threshold: int
         Value for the pixel threshold. Default is 3.
 
     Returns
     -------
     diff: ndarray
         output array that has the same size and shape as the frames
- 
+
     """
 
-    diff = cv2.absdiff(storedFrame,currentFrame)
-    _,diff = cv2.threshold(diff,pixThreshold[0],255,cv2.THRESH_BINARY)
+    diff = cv2.absdiff(stored_frame, curr_frame)
+    _, diff = cv2.threshold(diff, pix_threshold[0], 255, cv2.THRESH_BINARY)
     diff = diff / 255
     return diff
 
-def trackdiffImage(storedFrame,currentFrame,pixThreshold):
+
+def track_diff_image(stored_frame, curr_frame, pix_threshold):
     """
     This function finds the pixel difference between the current frame and
-    the previous frame. Similar to the diffImage function, but uses a higher threshold
+    the previous frame. Similar to the diff_image function, but uses a higher threshold
     and does not normalize the diff array.
 
     Parameters
     ---------
-    storedFrame: ndarray
+    stored_frame: ndarray
         Previous frame that has been blurred by the grayBlur function.
-    currentFrame: ndarray
+    curr_frame: ndarray
         The current frame; blurred using the grayBlur function.
-    pixThreshold: int
+    pix_threshold: int
         Value for the pixel threshold. Default is 7.
 
     Returns
     -------
     diff: ndarray
         Output array that has the same size and shape as the frames
- 
+
     """
-    diff = cv2.absdiff(storedFrame,currentFrame)
-    _,diff = cv2.threshold(diff,pixThreshold[1],255,cv2.THRESH_BINARY)
+    diff = cv2.absdiff(stored_frame, curr_frame)
+    _, diff = cv2.threshold(diff, pix_threshold[1], 255, cv2.THRESH_BINARY)
     return diff
 
-def Blur(image):
+
+def blur(image):
     """
     This function blurs a frame using the GaussionBlur function from opencv.
-    
+
     Parameters
     ---------
     image: ndarray
@@ -241,13 +228,14 @@ def Blur(image):
 
     """
 
-    return cv2.GaussianBlur(image,(7,7),0) 
+    return cv2.GaussianBlur(image, (7, 7), 0)
 
-def grayBlur(image):
+
+def gray_blur(image):
     """
-    This function blurs a RGB frame turned to gray 
+    This function blurs a RGB frame turned to gray
     using the GaussionBlur function from opencv.
-    
+
     Parameters
     ---------
     image: ndarray
@@ -260,9 +248,10 @@ def grayBlur(image):
     """
 
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    return cv2.GaussianBlur(gray,(7,7),0) 
+    return cv2.GaussianBlur(gray, (7, 7), 0)
 
-def convertMaskToWeights(mask):
+
+def convert_mask_to_weights(mask):
     """
     This function takes a 1088x660 array of ROI locations and converts it to an
     array of weights for binning.
@@ -276,16 +265,17 @@ def convertMaskToWeights(mask):
     -------
     w: ndarray
         1-dimensional array of unique values
- 
+
     """
     vals = np.unique(mask)
     for i in range(len(vals)):
-        mask[mask==vals[i]]=i
+        mask[mask == vals[i]] = i
     mask = mask.astype(int)
-    w = mask.ravel() 
+    w = mask.ravel()
     return w
 
-def loadmodeImage(modefilename):
+
+def load_mode_image(mode_filename):
     """
     This function determines if a mode image file exists then loads it as an array.
 
@@ -301,12 +291,13 @@ def loadmodeImage(modefilename):
 
     """
     try:
-        e = imread(modefilename)
+        e = imread(mode_filename)
     except:
         exit('Cannot open mode file')
-    return(e)
+    return e
 
-def faststrptime(val):
+
+def fast_strp_time(val):
     """
     This function splits a teensy string for time values and converts them as
     a datetime object.
@@ -315,28 +306,29 @@ def faststrptime(val):
     ---------
     val: string
          String containing values for time teensy command
-    
+
     Returns
     -------
-    A datetime object 
- 
+    A datetime object
+
     """
     splits1 = val.split("/")
     splits2 = splits1[2].split(":")
     return datetime.datetime(
-        int(splits1[2][0:4]), # %Y
-        int(splits1[0]), # %m
-        int(splits1[1]), # %d
-        int(splits2[0][4:len(splits2[0])]), # %H
-        int(splits2[1]), # %M
-        int(splits2[2][0:2]), # %s
+        int(splits1[2][0:4]),  # %Y
+        int(splits1[0]),  # %m
+        int(splits1[1]),  # %d
+        int(splits2[0][4:len(splits2[0])]),  # %H
+        int(splits2[1]),  # %M
+        int(splits2[2][0:2]),  # %s
     )
 
-def makenumROIsimage():
+
+def make_num_ROIs_image(rois):
     """
     This function determines the last frame of the last movie, then writes the
     well number in the center of each well.
-    
+
     Outputs
     -------
     A PNG of the last frame
@@ -345,179 +337,208 @@ def makenumROIsimage():
     """
 
     num = 0
-    for i,line in enumerate(glob.glob(videoStream)): 
-#        print(i,line)
-        movienum = int(line.split('/')[-1].split('.')[0].split('-')[1])
+    for i, line in enumerate(glob.glob(videoStream)):
+        if long_movie:
+            movienum = int(re.split(' |_|.avi', line)[1])
+        else:
+            movienum = int(re.split(' |_|.avi', line)[4])
         if movienum > num:
-                num = movienum
-                filename = line
+            num = movienum
+            filename = line
 
-    myFrameNumber = (frameRate*movlen)-1
+    myFrameNumber = (frame_rate * movlen) - 1
     cap = cv2.VideoCapture(filename)
     totalFrames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
 
     if myFrameNumber >= 0 & myFrameNumber <= totalFrames:
-       cap.set(cv2.CAP_PROP_POS_FRAMES,myFrameNumber)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, myFrameNumber)
 
     ret, frame = cap.read()
-    cv2.imwrite("lastframe.png", frame)
-    image = Image.open('lastframe.png')
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
+    try:
+        imread("lastframe.png")
+    except:
+        cv2.imwrite("lastframe.png", frame)
+        image = Image.open('lastframe.png')
+        draw = ImageDraw.Draw(image)
+        font = ImageFont.load_default()
 
-    rois = []
-    with open(roisfile, 'rb') as f:
-        rois = pickle.load(f)
-    
-#    print(rois)
+        i = 1
+        for roi in rois:
+            n = np.array(roi)
+            xs = n[:, 0]
+            ys = n[:, 1]
+
+            x1 = xs[0]
+            y1 = ys[0]
+            x2 = xs[1]
+            y2 = ys[1]
+
+            midx = math.ceil((x1 + x2) / 2)
+            midy = math.ceil((y1 + y2) / 2)
+
+            draw.text((midx, midy), str(i), font=font)
+            i += 1
+
+        image.save('NumberedROIsImage.png')
+
+def make_mask_from_rois(rois):
+    roimask = np.zeros((ydim, xdim))
+
     i = 1
     for roi in rois:
-#       print(roi)
        n = np.array(roi)
        xs = n[:, 0]
        ys = n[:, 1]
-       x1 = min(xs)
-       y1 = min(ys)
-       x2 = max(xs)
-       y2 = max(ys)
-
-       midx = math.ceil((x1 + x2)/2)
-       midy = math.ceil((y1 + y2)/2)
-        
-       draw.text((midx,midy), str(i), font=font)
-       i += 1
-    image.save('NumberedROIsImage.png')    
-
-def createlongmovie():
-
-    modename = filenumber    
-    imageMode(modename)
-    modefilename = "mode_" + modename + ".png"
-    try:
-       imread(modefilename)
-    except:
-       imageMode(modename)
-
-    e = loadmodeImage(modefilename)
-
-    roimask = np.zeros((ydim,xdim))
-    f = open(roisfile, 'r')
-    lines = f.readlines()
-    i = 1
-    i2 = 0
-    for line in lines:
-       try:
-               print(int(line.split(' ')[0]))
-       except ValueError:
-               i2 += 1
-               continue
-       minx = int(line.split(' ')[0])
-       miny = int(line.split(' ')[1])
-       maxx = int(line.split(' ')[2])
-       maxy = int(line.split(' ')[3])
+       minx = min(xs)
+       miny = min(ys)
+       maxx = max(xs)
+       maxy = max(ys)
        roimask[int(miny):int(maxy),int(minx):int(maxx)] = i
        i += 1
-    numberofwells = i-1
-    #numberofcols = int(i2/2)
-    #numberofrows = int(numberofwells/numberofcols)
-    roimaskweights = convertMaskToWeights(roimask)
+
+    numberofwells = i - 1
+
+    return roimask, numberofwells
+
+def write_to_centroid_motion(videostream, num_of_wells, cen_data, pix_data, i, num_frames):
+    file = open(videostream + ".centroid2", 'w')
+
+    for x in range(0, num_frames):
+        for y in range(0, num_of_wells * 2):
+            file.write(str(int(cen_data[x, :][y])) + '\n')
+    pix_data = pix_data[:i, :]
+    pix_data = pix_data[:, 1:]
+    file = open(videostream + ".motion2", 'w')
+
+    for x in range(0, num_frames):
+        for y in range(0, num_of_wells):
+            file.write(str(int(pix_data[x, :][y])) + '\n')
+
+def fill_rois(contours, roi_mask, number_of_wells):
+    MIN_THRESH = 20.0
+    MIN_THRESH_P = 20.0
+    roi_dict = {}
+
+    for r in range(0, number_of_wells):
+        roi_dict[r + 1] = []
+    for cs in range(0, len(contours)):
+        if cv2.contourArea(contours[cs]) < 1.0:
+            continue
+        if cv2.arcLength(contours[cs], True) < 1.0:
+            continue
+        if cv2.contourArea(contours[cs]) > MIN_THRESH or cv2.arcLength(contours[cs], True) > MIN_THRESH_P:
+            M = cv2.moments(contours[cs])
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            area = cv2.contourArea(contours[cs])
+            perim = cv2.arcLength(contours[cs], True)
+            if int(roi_mask[cY, cX]) == 0:
+                continue
+            if not roi_dict[int(roi_mask[cY, cX])]:
+                roi_dict[int(roi_mask[cY, cX])].append((area * perim, cX, cY))
+            else:
+                if roi_dict[int(roi_mask[cY, cX])][0][0] < area * perim:
+                    roi_dict[int(roi_mask[cY, cX])][0] = (area * perim, cX, cY)
+
+    return roi_dict
+
+def count_rois(roi_dict, stored_image):
+    counts = []
+    keys = roi_dict.keys()
+    keys = sorted(keys)
+    for k in keys:
+        x = -10000
+        y = -10000
+        if roi_dict[k]:
+            x = roi_dict[k][0][1]
+            y = roi_dict[k][0][2]
+        counts.append(x)
+        counts.append(y)
+        cv2.line(stored_image, (x, y), (x, y), (255, 255, 255), 2)
+
+    return counts
+
+def create_long_movie(rois):
+    total_frames = (frame_rate * movlen) - 1
+    splits = [i * total_frames / mode_split for i in range(1, mode_split + 1)]
+    splits = [1] + splits  # adding the first value so things are inclusive
+    modematrices = []
+    for n in range(0, len(splits) - 1):
+        modename = str(int(splits[n])) + "to" + str(int(splits[n + 1]))
+        frames = range(int(splits[n]), int(splits[n + 1]), frame_split)
+        modefilename = "mode_" + modename + ".png"
+        image_mode_LM(modename, frames)
+        e = load_mode_image(modefilename)
+        stored_image = np.array(e * 255, dtype=np.uint8)
+        storedMode0 = blur(stored_image)
+        modematrices.append([int(splits[n]), int(splits[n + 1]), storedMode0])
+    modematrices = sorted(modematrices, key=lambda x: x[0])
+
+    roi_mask, number_of_wells = make_mask_from_rois(rois)
+    roimaskweights = convert_mask_to_weights(roi_mask)
 
     cap = cv2.VideoCapture(videoStream)
 
-    cap.set(3,roimask.shape[1])
-    cap.set(4,roimask.shape[0])
+    cap.set(3, roi_mask.shape[1])
+    cap.set(4, roi_mask.shape[0])
 
-    ret,frame = cap.read()
-    storedImage = np.array(e * 255, dtype = np.uint8)
-    storedMode = Blur(storedImage)
-    storedFrame = grayBlur(frame)
-    cenData = np.zeros([ saveFreq, len(np.unique(roimaskweights))*2 -2])
-    pixData = np.zeros([ saveFreq, len(np.unique(roimaskweights))])
-    i = 0;
-    totalFrames = 0
-    while(cap.isOpened()):
-        ret,frame = cap.read()
-        if ret == False:
+    ret, frame = cap.read()
+    stored_frame = gray_blur(frame)
+    cen_data = np.zeros([save_freq, len(np.unique(roimaskweights)) * 2 - 2])
+    pix_data = np.zeros([save_freq, len(np.unique(roimaskweights))])
+    i = 0  # these values should be 1? since we already read one frame, not sure . . .
+    total_frames = 0  # same as above
+    t_frames = 0
+    while cap.isOpened():
+        t_frames += 1
+        ret, frame = cap.read()
+        if not ret:
             break
-        currentFrame = grayBlur(frame)
-        diffpix = diffImage(storedFrame,currentFrame,pixThreshold)
-        diff = trackdiffImage(storedMode,currentFrame,pixThreshold)
+        curr_frame = gray_blur(frame)
+        for x in modematrices:
+            if x[0] <= t_frames <= x[1]:
+                stored_mode = x[2]
+        diffpix = diff_image(stored_frame, curr_frame, pix_threshold)
+        diff = track_diff_image(stored_mode, curr_frame, pix_threshold)
         diff.dtype = np.uint8
-        contours,hierarchy = cv2.findContours(diff, cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
-        MIN_THRESH = 20.0
-        MIN_THRESH_P = 20.0
-        roi_dict = {}
-        for r in range(0,numberofwells):
-            roi_dict[r+1] = []
-        for cs in range(0,len(contours)):
-            if cv2.contourArea(contours[cs]) < 1.0:
-                continue
-            if cv2.arcLength(contours[cs],True) < 1.0:
-                continue
-            if cv2.contourArea(contours[cs]) > MIN_THRESH or cv2.arcLength(contours[cs],True) > MIN_THRESH_P:
-                M = cv2.moments(contours[cs])
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                area = cv2.contourArea(contours[cs])
-                perim = cv2.arcLength(contours[cs],True)
-                if int(roimask[cY,cX]) == 0:
-                   continue
-                if not roi_dict[int(roimask[cY,cX])]:
-                    roi_dict[int(roimask[cY,cX])].append((area*perim,cX,cY))
-                else:
-                    if roi_dict[int(roimask[cY,cX])][0][0] < area*perim:
-                        roi_dict[int(roimask[cY,cX])][0] = (area*perim,cX,cY)
+        contours, hierarchy = cv2.findContours(diff, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+        roi_dict = fill_rois(contours, roi_mask, number_of_wells)
 
         pixcounts = np.bincount(roimaskweights, weights=diffpix.ravel())
-        pixData[i,:] = np.hstack((pixcounts))
-        counts = []
-        keys = roi_dict.keys()
-        keys = sorted(keys)
-        for k in keys:
-            x = -10000
-            y = -10000
-            if roi_dict[k]:
-                x = roi_dict[k][0][1]
-                y = roi_dict[k][0][2]
-            counts.append(x)
-            counts.append(y)
-            cv2.line(storedImage,(x,y),(x,y),(255,255,255),2)
-        if i == 100000:
-            cv2.imwrite(videoStream + '_trackedimagewithlines_' + str(i) + ".png", storedImage)
-        cenData[i,:] = np.asarray(counts)
-        totalFrames += 1
-        storedFrame = currentFrame
+        pix_data[i, :] = np.hstack((pixcounts))
+
+        counts = count_rois(roi_dict, stored_image)
+        cen_data[i, :] = np.asarray(counts)
+
+        if i == (frame_rate * movlen) - 1:
+            cv2.imwrite(videoStream + '_trackedimagewithlines_' + str(i) + ".png", stored_image)
+
+        total_frames += 1
+        stored_frame = curr_frame
         i += 1
 
-    file = open(videoStream + ".centroid2",'w')
-    for x in range(0,(frameRate*movlen)-1):
-        for y in range(0,numberofwells*2):
-            file.write(str(int(cenData[x,:][y])) + '\n')
-    pixData = pixData[:i,:]
-    pixData = pixData[:,1:]
-    file = open(videoStream + ".motion2",'w')
-    for x in range(0,(frameRate*movlen)-1):
-        for y in range(0,numberofwells):
-            file.write(str(int(pixData[x,:][y])) + '\n')
+    write_to_centroid_motion(videoStream, number_of_wells, cen_data, pix_data, i, (frame_rate * movlen) - 1)
 
     # 10/2/20204:53:31 PM\n
-    file = open(videoStream +".timestamp2",'w')
-    a = datetime.datetime(100,1,1,4,53,31)
+    file = open(videoStream + ".timestamp2", 'w')
+    a = datetime.datetime(100, 1, 1, 4, 53, 31)
     i = 1
-    for frame in range(0,(frameRate*movlen)):
-        file.write('10/2/2020'+str(a.time())+' PM\n')
-        if i == int(frameRate):
-           a = a + datetime.timedelta(0,1)
-           i = 0
-        i+=1
+    for frame in range(0, (frame_rate * movlen)):
+        file.write('10/2/2020' + str(a.time()) + ' PM\n')
+        if i == int(frame_rate):
+            a = a + datetime.timedelta(0, 1)
+            i = 0
+        i += 1
     cap.release()
     cv2.destroyAllWindows()
     try:
         image = Image.open('lastframe.png')
     except:
-        makenumROIsimage()
+        make_num_ROIs_image(rois)
 
-def main():
+
+def main(rois):
     """
     The main function of the analysis script. Analyzes an individual movie for movement in well.
 
@@ -535,67 +556,65 @@ def main():
     counter = 0
     fullcounter = 0
     movielist = []
-    movielists =[]
+    movielists = []
     timestamp_list = []
-    filteredlist = [] 
+    filteredlist = []
     startdate = "2020-02-26"
-    
+
     for line in lines:
         TAPES = line.split('\t')
         if int(TAPES[2]) == 1 or int(TAPES[2]) == 2:
             filteredlist.append(line)
-#    print(filteredlist)
+
     for newline in filteredlist:
         TAPES = newline.split('\t')
-#        print(fullcounter, TAPES)
-        fullcounter +=1
+        fullcounter += 1
         if int(TAPES[2]) == 2:
-             timestamp_list.append(0)
-             continue
+            timestamp_list.append(0)
+            continue
         startdate2 = startdate.split("-")[1] + "/" + startdate.split("-")[2] + "/" + startdate.split("-")[0]
-#        print(startdate2)
         dateplustime = startdate2 + TAPES[0][0:len(TAPES[0])]
-        thistime = faststrptime(dateplustime)
-#        print(thistime)
+        thistime = fast_strp_time(dateplustime)
         unixtimestamp = datetime.datetime.timestamp(thistime)
         timestamp_list.append(int(unixtimestamp))
-#    print(timestamp_list)
-    i = 0    
-    for element in timestamp_list:
 
-        if i < (len(timestamp_list)-1) and timestamp_list[i+(counter-i)]-timestamp_list[i] >= 3600:
-           counter += 1
-           i = counter
-           movielist.append(counter)
-           
-           if len(movielist) <= 15:
+    i = 0
+    for element in timestamp_list:
+        if i < (len(timestamp_list) - 1) and timestamp_list[i + (counter - i)] - timestamp_list[i] >= 3600 and \
+                timestamp_list[i + (counter - i)] - timestamp_list[i] < 7200:
+            counter += 1
+            i = counter
+            movielist.append(counter)
+
+            if len(movielist) <= 15:
                 numcounter = 0
                 j = 0
                 for step in movielist:
-                    movielists[len(movielists)-1].append(movielist[j])
+                    movielists[len(movielists) - 1].append(movielist[j])
                     j += 1
                 movielist = []
-                continue   
-           else:
+                continue
+            else:
                 movielists.append(movielist)
                 movielist = []
                 numcounter = 0
                 continue
 
-        if i < (len(timestamp_list)-1) and timestamp_list[i+1]-timestamp_list[i] >= 3600:
-           counter += 1
-           i = counter
-           movielist.append(counter)
+        if i < (len(timestamp_list) - 1) and timestamp_list[i + 1] - timestamp_list[i] >= 3600 and timestamp_list[
+            i + 1] - timestamp_list[i] < 7200:
+            counter += 1
+            i = counter
+            movielist.append(counter)
 
-           if len(movielist) <= 15:
+            if len(movielist) <= 15:
                 numcounter = 0
                 j = 0
                 for step in movielist:
-                    movielists[len(movielists)-1].append(movielist[j])
+                    movielists[len(movielists) - 1].append(movielist[j])
                     j += 1
                 movielist = []
                 continue
-           else:
+            else:
                 movielists.append(movielist)
                 movielist = []
                 numcounter = 0
@@ -603,197 +622,102 @@ def main():
 
         counter += 1
         numcounter += 1
-
         if element != 0:
-             movielist.append(counter)
-             i += 1
-        
+            movielist.append(counter)
+            i += 1
+
         if numcounter == 30:
             numcounter = 0
             movielists.append(movielist)
             movielist = []
-        
-        if i > (len(timestamp_list)-1):
+
+        if i > (len(timestamp_list) - 1):
             movielists.append(movielist)
             movielist = []
             numcounter = 0
-            
+
     numendlists = counter - fullcounter
-    first = len(movielists)-numendlists
+    first = len(movielists) - numendlists
     last = len(movielists)
     del movielists[first:last]
-    
+
     for x in movielists:
         for y in x:
-            fnum = int(filenumber)
-            if fnum <= 183 and fnum-2 == y:
-                print(fnum, fnum - 2)
+            if int(filenumber) == y:
                 movielist = x
-            elif 185 <= fnum <= 193:
-                if (fnum - ((abs(fnum-185)/2)+1)-2) == y:
-                    print(fnum, (fnum - ((abs(fnum-185)/2)+1))-2)
-                    movielist = x
-            elif 194 <= fnum <= 201:
-                if (fnum-5-2) == y:
-                    print(fnum, fnum-5-2)
-                    movielist = x
-            elif 203 <= fnum <= 211:
-                if (fnum - ((abs(fnum-203)/2)+6)-2) == y:
-                    print(fnum, (fnum - ((abs(fnum-203)/2)+6))-2)
-                    movielist = x
-            elif 212 <= fnum <= 288:
-                if (fnum-10-2) == y:
-                    print(fnum, fnum-10-2)
-                    movielist = x
-            elif 292 <= fnum <= 431:
-                if (fnum-11-2) == y:
-                    print(fnum, fnum-11-2)
-                    movielist = x
-            elif 434 <= fnum:
-#                print(fnum)
-                if (fnum-12-2) == y:
-                    print(fnum, fnum-12-2)
-                    movielist = x
 
-
-#    print(movielist)
-    modename = str(movielist[0]) + "to" + str(movielist[len(movielist)-1])
+    modename = str(movielist[0]) + "to" + str(movielist[len(movielist) - 1])
     modefilename = "mode_" + modename + ".png"
-    
-    """
     try:
-       imread(modefilename)
-    except:
-       imageMode(modename,movielist)
-    """
-    vidcap = cv2.VideoCapture(videoStream)
-    frame_width = int(vidcap.get(3))
-    frame_height = int(vidcap.get(4))
-#    print(frame_width, frame_height)
-           
-    if not os.path.isfile(modefilename):
-        calc_mode_img(vidcap, frame_width, frame_height, modefilename, False)
-    
-#    mode_blur_img = cv2.imread(modefilename)
+        imread(modefilename)
+    except Exception as e:
+        print(e)
+        print('calculating new mode')
+        image_mode(modename, movielist)
 
-    e = loadmodeImage(modefilename)
+    e = load_mode_image(modefilename)
 
-    roimask = np.zeros((ydim,xdim))
-   
-    with open(roisfile, 'rb') as f:
-        rois = pickle.load(f)
+    roi_mask, number_of_wells = make_mask_from_rois(rois)
+    roimaskweights = convert_mask_to_weights(roi_mask)
 
-    for roi in rois:
-       n = np.array(roi)
-       xs = n[:, 0]
-       ys = n[:, 1]
-       minx = min(xs)
-       miny = min(ys)
-       maxx = max(xs)
-       maxy = max(ys)
-       roimask[int(miny):int(maxy),int(minx):int(maxx)] = i
-       i += 1
-    
-    numberofwells = len(rois)
-    roimaskweights = convertMaskToWeights(roimask)
-
-    print(videoStream)
     cap = cv2.VideoCapture(videoStream)
-#    print(cap)
-    cap.set(3,roimask.shape[1])
-    cap.set(4,roimask.shape[0])
-    
-    ret,frame = cap.read()
-#    print("f", frame)
-    storedImage = np.array(e * 255, dtype = np.uint8)
-    storedMode = Blur(storedImage)
-    storedFrame = grayBlur(frame)
-    cenData = np.zeros([ int(saveFreq), len(np.unique(roimaskweights))*2 -2])
-    pixData = np.zeros([ int(saveFreq), len(np.unique(roimaskweights))])
-    i = 0;
-    totalFrames = 0
-    while(cap.isOpened()):
-        ret,frame = cap.read()
-        if ret == False:
-            break
-        currentFrame = grayBlur(frame)
-        diffpix = diffImage(storedFrame,currentFrame,pixThreshold)
-        diff = trackdiffImage(storedMode,currentFrame,pixThreshold)
-        diff.dtype = np.uint8
-        contours,hierarchy = cv2.findContours(diff, cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
-        MIN_THRESH = 20.0
-        MIN_THRESH_P = 20.0
-        roi_dict = {}
-        for r in range(0,numberofwells):
-            roi_dict[r+1] = []
-        for cs in range(0,len(contours)):
-            if cv2.contourArea(contours[cs]) < 1.0:
-                continue
-            if cv2.arcLength(contours[cs],True) < 1.0:
-                continue
-            if cv2.contourArea(contours[cs]) > MIN_THRESH or cv2.arcLength(contours[cs],True) > MIN_THRESH_P:
-                M = cv2.moments(contours[cs])
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                area = cv2.contourArea(contours[cs])
-                perim = cv2.arcLength(contours[cs],True)
-                if int(roimask[cY,cX]) == 0:
-                   continue
-                if not roi_dict[int(roimask[cY,cX])]:
-                    roi_dict[int(roimask[cY,cX])].append((area*perim,cX,cY))
-                else:
-                    if roi_dict[int(roimask[cY,cX])][0][0] < area*perim:
-                        roi_dict[int(roimask[cY,cX])][0] = (area*perim,cX,cY)
 
-#        print(len(roimaskweights), len(diffpix.ravel()))
+    total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+
+    if total_frames+1 != frame_rate:
+        print(f'wrong number of frames, expected {frame_rate}, got {total_frames+1}')
+
+    cap.set(3, roi_mask.shape[1])
+    cap.set(4, roi_mask.shape[0])
+
+    ret, frame = cap.read()
+    stored_image = np.array(e * 255, dtype=np.uint8)
+    stored_mode = blur(stored_image)
+    stored_frame = gray_blur(frame)
+    cen_data = np.zeros([int(save_freq), len(np.unique(roimaskweights)) * 2 - 2])
+    pix_data = np.zeros([int(save_freq), len(np.unique(roimaskweights))])
+    print('init', cen_data.shape, pix_data.shape)
+    i = 0
+    total_frames = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        currentFrame = gray_blur(frame)
+        diffpix = diff_image(stored_frame, currentFrame, pix_threshold)
+        diff = track_diff_image(stored_mode, currentFrame, pix_threshold)
+        diff.dtype = np.uint8
+        contours, hierarchy = cv2.findContours(diff, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        roi_dict = fill_rois(contours, roi_mask, number_of_wells)
+
         pixcounts = np.bincount(roimaskweights, weights=diffpix.ravel())
-        pixData[i,:] = np.hstack((pixcounts))
-        counts = []
-        keys = roi_dict.keys()
-        keys = sorted(keys)
-        for k in keys:
-            x = -10000
-            y = -10000
-            if roi_dict[k]:
-                x = roi_dict[k][0][1]
-                y = roi_dict[k][0][2]
-            counts.append(x)
-            counts.append(y)
-            cv2.line(storedImage,(x,y),(x,y),(255,255,255),2)
+        pix_data[i, :] = np.hstack((pixcounts))
+
+        counts = count_rois(roi_dict, stored_image)
+        cen_data[i, :] = np.asarray(counts)
+
         if i == 284:
-            cv2.imwrite(videoStream + '_trackedimagewithlines_' + str(i) + ".png", storedImage)
-        cenData[i,:] = np.asarray(counts)
-        totalFrames += 1
-        storedFrame = currentFrame
+            cv2.imwrite(videoStream + '_trackedimagewithlines_' + str(i) + ".png", stored_image)
+
+        total_frames += 1
+        stored_frame = currentFrame
         i += 1
 
-    pixData = pixData[:i,:]
-    pixData = pixData[:,1:] 
-
-    framerate_actual = pixData.shape[0]
-    file = open(videoStream + ".centroid2",'w')
-    for x in range(0,frameRate):
-        for y in range(0,numberofwells*2):
-            file.write(str(int(cenData[x,:][y])) + '\n')
-     
-    file = open(videoStream + ".motion2",'w')
-    
-    for x in range(0,framerate_actual):
-        for y in range(0,numberofwells):
-            file.write(str(int(pixData[x,:][y])) + '\n')
+    write_to_centroid_motion(videoStream, number_of_wells, cen_data, pix_data, i, total_frames)
 
     cap.release()
     cv2.destroyAllWindows()
-    
+
     try:
         image = Image.open('lastframe.png')
     except:
-        makenumROIsimage()
+        make_num_ROIs_image(rois)
 
-if (not longmovie):
-    main()
-else:
-    createlongmovie()
+if __name__ == "__main__":
+    with open(rois_file, 'rb') as f:
+        rois = pickle.load(f)
 
-
-
+    if not long_movie:
+        main(rois)
+    else:
+        create_long_movie(rois)

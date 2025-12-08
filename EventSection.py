@@ -1,9 +1,5 @@
 #!/usr/bin/python
 import datetime
-import time
-import Fish
-import fileloading # for the constant values and access to options
-from datetime import timedelta
 
 class EventSection:
 
@@ -35,7 +31,7 @@ class EventSection:
 		self.indexdict[str(k)] = (v1,v2)
 
 	#4:26:00 PM      1       v120 D40 a0.01 f500 d5 p D500 a1 f500 d5 p D455 v200;        
-	def process_teensy_str(self, teensystr):
+	def process_teensy_str(self, teensystr, msecperframe):
 		annotations = []
 		annotationsfinal = []
 		teensy = teensystr.split(" ")
@@ -73,14 +69,14 @@ class EventSection:
 			# plan, make dark flahses with v0 have earlier start and have the ones with v120 and v140 start at 26
 			# need to divide totalD so that it's in frames, not in milliseconds
 			if annotations[a][0] == 'a':
-				startframe = int(totalD / fileloading.msecperframe) + 4			
+				startframe = int(totalD / msecperframe) + 4
 				endframe = startframe + 8
 			elif annotations[a][0] == 'v':
 				if 100 < int(str(annotations[a][1:]).strip(";")) < 200: # NEED TO CHANGE THIS FOR ALL THE Vs SPECIFICALLY BETWEEN 100 and 200, OTHERWISE THEY WILL GO WITH THE ELSE STATEMENT (LIGHT AND OTHER DARKS)
-					startframe = int(totalD / fileloading.msecperframe) + 26
+					startframe = int(totalD / msecperframe) + 26
 					endframe = 266
 				else:
-					startframe = int(totalD / fileloading.msecperframe) + 18
+					startframe = int(totalD / msecperframe) + 18
 					endframe = 266
 			else:
 				print("Error, the events are not acoustic or visual (a or v), or there is a bug")
@@ -88,11 +84,11 @@ class EventSection:
 		#print(annotationsfinal)
 		return annotationsfinal
 
-	def add_event(self, eventtype, eventvoltage, eventtime):
+	def add_event(self, eventtype, eventvoltage, eventtime, msecperframe):
 		# This assumes the sections file just has slow-speed data labeled as "time" sections and high-speed data with various labels
 		if self.type != "time":
 			stringinput = str(''.join(eventvoltage.split("."))).strip()
-			annotatedeventlist = self.process_teensy_str(stringinput)
+			annotatedeventlist = self.process_teensy_str(stringinput, msecperframe)
 			for annotatedevent in annotatedeventlist:
 				if eventtype + "_" + str(''.join(  str(''.join(eventvoltage.split("."))).split(" ") )).strip().strip(";") + "_" + annotatedevent in self.events.keys():
 					self.events[eventtype + "_" + str(''.join(  str(''.join(eventvoltage.split("."))).split(" ") )).strip().strip(";") + "_" + annotatedevent].append(eventtime)
