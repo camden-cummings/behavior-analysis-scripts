@@ -1,40 +1,26 @@
+#!/usr/bin/python
 import datetime
 
 
 class EventSection:
 
     def __init__(self, namestring, startdate):
-        print('n', namestring, namestring.split('=')[1].split('-')[0].split('_')[1], namestring.split('=')[1].split('-')[0].split('_')[0])
-        print('n', namestring, namestring.split('=')[1].split('-')[1].split('_')[1], namestring.split('=')[1].split('-')[1].split('_')[0])
-
-        self.starttime = datetime.datetime.strptime(
-            startdate + " " + namestring.split('=')[1].split('-')[0].split('_')[1],
-            "%m/%d/%Y %H:%M:%S") + datetime.timedelta(days=int(namestring.split('=')[1].split('-')[0].split('_')[
-                                                                   0]))  # datetime #df_timestart = datetime.datetime.strptime(startdate + " 13:00:15", "%Y-%m-%d %H:%M:%S") #lf_timestart = lf_timestart + datetime.timedelta(days=1)
-        self.endtime = datetime.datetime.strptime(
-            startdate + " " + namestring.split('=')[1].split('-')[1].split('_')[1],
-            "%m/%d/%Y %H:%M:%S") + datetime.timedelta(days=int(namestring.split('=')[1].split('-')[1].split('_')[
-                                                                   0]))  # datetime #df_timestart = datetime.datetime.strptime(startdate + " 13:00:15", "%Y-%m-%d %H:%M:%S") #lf_timestart = lf_timestart + datetime.timedelta(days=1)
-        print(self.starttime, self.endtime)
-        self.name = namestring.split('=')[0].split('_')[
-            1]  # string #habituation_daytaps=1_15:25:30-1_16:59:00, e.g. daytaps
-        self.type = namestring.split('=')[0].split('_')[
-            0]  # string #habituation_daytaps=1_15:25:30-1_16:59:00, e.g. "habituation"
+        self.starttime = datetime.datetime.strptime(startdate + " " + namestring.split('=')[1].split('-')[0].split('_')[1], "%m/%d/%Y %H:%M:%S") + datetime.timedelta(days=int(namestring.split('=')[1].split('-')[0].split('_')[0])) # datetime #df_timestart = datetime.datetime.strptime(startdate + " 13:00:15", "%Y-%m-%d %H:%M:%S") #lf_timestart = lf_timestart + datetime.timedelta(days=1)
+        self.endtime = datetime.datetime.strptime(startdate + " " + namestring.split('=')[1].split('-')[1].split('_')[1], "%m/%d/%Y %H:%M:%S") + datetime.timedelta(days=int(namestring.split('=')[1].split('-')[1].split('_')[0])) # datetime #df_timestart = datetime.datetime.strptime(startdate + " 13:00:15", "%Y-%m-%d %H:%M:%S") #lf_timestart = lf_timestart + datetime.timedelta(days=1)
+        self.name = namestring.split('=')[0].split('_')[1] # string #habituation_daytaps=1_15:25:30-1_16:59:00, e.g. daytaps
+        self.type = namestring.split('=')[0].split('_')[0] # string #habituation_daytaps=1_15:25:30-1_16:59:00, e.g. "habituation"
         self.events = {}
         self.indexdict = {}
 
     def check_endtime(self, endDateTime):
         if self.starttime > endDateTime:
-            print(
-                "Error, the sections file starttime is after the end of the run . . . this seems unlikely to ever happen")
+            print("Error, the sections file starttime is after the end of the run . . . this seems unlikely to ever happen")
         if self.endtime > endDateTime:
-            print(
-                "Error, the end time listed in the sections file is after the real end of the file, replacing the end time - 1 min, but check your sections file")
+            print("Error, the end time listed in the sections file is after the real end of the file, replacing the end time - 1 min, but check your sections file")
             self.endtime = endDateTime - datetime.timedelta(minutes=1)
         # Have gotten strange bugs in last second that don't seem to be an issue with first second, so not worrying about it for start time check
         if self.endtime == endDateTime:
-            print(
-                "Warning, the end time listed in the sections file is the same as the real end of the file, which is risky because that final second is often incomplete, replacing the end time - 1 min")
+            print("Warning, the end time listed in the sections file is the same as the real end of the file, which is risky because that final second is often incomplete, replacing the end time - 1 min")
             self.endtime = endDateTime - datetime.timedelta(minutes=1)
 
     def check_starttime(self, startDateTime):

@@ -389,8 +389,7 @@ def main(graphparametersfile, baselinelight, obendfilters, cbendfilters):
             ribbon_plot(arraylist, '_'.join(file3.split('.')[0].split('_')[:-1]), yaxis, "Events")
             calc_stats('_'.join(file3.split('.')[0].split('_')[:-1]), arraylist, False)
             nolabel = False
-        if (nolabel):
+        if nolabel:
             print("Label for plot is not in the input label file! ", file3)
             box_plot(arraylist, '_'.join(file3.split('.')[0].split('_')[:-1]), "No label", genos)
             ribbon_plot(arraylist, '_'.join(file3.split('.')[0].split('_')[:-1]), "No label", genos)
-
