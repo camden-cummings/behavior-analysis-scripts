@@ -283,10 +283,10 @@ def loading_procedures():
     print("Done loading events")
 
     fish_list = generate_fish_objects(dp_data_array, tuple_rho_theta[0], tuple_rho_theta[1], tuple_rho_theta[2],
-                                      tuple_rho_theta[3], events, hs_dpix, rois_dict)
+                                      tuple_rho_theta[3], hs_dpix, hs_pos, rois_dict)
     #    print(fish_list)
     #    print(global_tuple_events[2])
-    return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], hs_pos
+    return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], events
 
 def initialize_args():
     print("Initializing arguments")
