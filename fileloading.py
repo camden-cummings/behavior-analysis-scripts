@@ -17,112 +17,112 @@ from fileloading_helpers import get_dists_and_posns, get_rois_from_csv, get_time
 # Input arguments
 parser = argparse.ArgumentParser(description='loading for fish behavior files')
 parser.add_argument('-longmovie', type=str, action="store",
-                    dest="longmoviename", default="nomovie")
+                    dest="long_movie_name", default="nomovie")
 parser.add_argument('-outputmovies', action="store_true",
-                    dest="outputmovies", default=False)
+                    dest="output_movies", default=False)
 parser.add_argument('-r', type=str, action="store", dest="roisfile")
 # Tracked data from before code was updated to have output ROIs, irrelevant for new users, only compatible with 96-well plates
 parser.add_argument('-oldtracking', action="store_true",
-                    dest="oldtracking", default=False)
+                    dest="old_tracking", default=False)
 parser.add_argument('-xyhm', action="store_true", dest="xyhm", default=False)
 parser.add_argument('-social', action="store_true",
                     dest="social", default=False)
 parser.add_argument('-graphonly', action="store_true",
-                    dest="graphonly", default=False)
+                    dest="graph_only", default=False)
 # CURRENTLY NOT COMPATIBLE WITH STIMULI THAT NEED FILTERING
-parser.add_argument('-graphmulti', type=str, action="store", dest="graphmulti")
+parser.add_argument('-graphmulti', type=str, action="store", dest="graph_multi")
 parser.add_argument('-j', type=str, action="store",
-                    dest="graphparameters", default="PlotParameters")
+                    dest="graph_parameters", default="PlotParameters")
 
-parser.add_argument('-e', type=str, action="store", dest="eventsfile")
-parser.add_argument('-c', type=str, action="store", dest="centroidfile")
-parser.add_argument('-d', type=str, action="store", dest="dpixfile")
+parser.add_argument('-e', type=str, action="store", dest="events_file")
+parser.add_argument('-c', type=str, action="store", dest="centroid_file")
+parser.add_argument('-d', type=str, action="store", dest="dpix_file")
 parser.add_argument('-m', type=str, action="store",
-                    dest="movieprefix", default="")
+                    dest="movie_prefix", default="")
 parser.add_argument('-g', type=str, action="store", dest="genotype_file")
 parser.add_argument('-s', type=str, action="store",
-                    dest="sectionsfile", default="sectionsfile")
+                    dest="sections_file", default="sectionsfile")
 parser.add_argument('-n', type=int, action="store",
                     dest="num_of_wells", default=96)
 parser.add_argument('-i', type=float, action="store",
-                    dest="msecperframe", default=3.508772)
+                    dest="msec_per_frame", default=3.508772)
 
 # not used in fileloading but used in processmotiondata
 # The classic Schier (and now Prober) sleep plots are inactive min / hour (sleep) and active sec / hour (with sleep bouts not counted)
-parser.add_argument('-a', type=str, action="store", dest="activitytimes",
+parser.add_argument('-a', type=str, action="store", dest="activity_times",
                     default="1/60,60/600,60/3600,1/3600")  # list of comparisons for activity data in seconds
 # list of times bins for the bout data (ie, ave bout speed / minute) in seconds
 parser.add_argument('-b', type=str, action="store",
-                    dest="boutbins", default="60,600,3600")
+                    dest="bout_bins", default="60,600,3600")
 # List of thresholds for the distance and dpix calculations, which typically should not be touched. First is for distance, which is less robust than dpix, and after is the dpix value. This is the threshold value to be counted for a bout if greater than or equal to.
 parser.add_argument('-v', type=str, action="store",
-                    dest="thresholdvalues", default="0.5,3.0")
+                    dest="threshold_values", default="0.5,3.0")
 # List of high-speed thresholds for the distance and dpix calculations, which typically should not be touched. First is for distance, which is less robust than dpix, and after is the dpix value. This is the threshold value to be counted for a bout if greater than or equal to.
 parser.add_argument('-w', type=str, action="store",
-                    dest="hsthresholdvalues", default="0.9,3.0")
+                    dest="hs_threshold_values", default="0.9,3.0")
 # Same as above but for number of frames.
 parser.add_argument('-f', type=str, action="store",
-                    dest="thresholdframes", default="1,3")
+                    dest="threshold_frames", default="1,3")
 # Same as above but for number of frames and high-speed data.
 parser.add_argument('-x', type=str, action="store",
-                    dest="hsthresholdframes", default="2,3")
+                    dest="hs_threshold_frames", default="2,3")
 # thresholds for activity data, first distance and second dpix (differs from bout thresholds because we don't have frame considerations)
 parser.add_argument('-y', type=str, action="store",
-                    dest="activitytimesthresholds", default="1,10")
+                    dest="activity_times_thresholds", default="1,10")
 # ((boutrev > 4.0) and (0.3 < (boutspeed) < 1.3) and (boutdistance > 70)):
 parser.add_argument('-z', type=str, action="store",
-                    dest="seizurefilters", default="4.0,0.3,1.3,70")
+                    dest="seizure_filters", default="4.0,0.3,1.3,70")
 # baseline level of light, used to determine what is a dark flash for filtering O-bend
 parser.add_argument('-l', type=int, action="store",
-                    dest="lightbaseline", default=200)
+                    dest="light_baseline", default=200)
 # two measures that are intersected (both must be true), and responses with greater magnitude than both are considered true O-bends. The two measures are "responsetime" and "sumabsha" (sum of absolute value of heading angles)
-parser.add_argument('-o', type=str, action="store", dest="obendfilter",
+parser.add_argument('-o', type=str, action="store", dest="obend_filter",
                     default="60,>:responsetime,10,>:responsesumabsheadingangle")
 # two measures that are intersected (both must be true), and responses with greater magnitude than both are considered true C-bends. The two measures are "responsevelocity" and "responsecumdpix"
-parser.add_argument('-p', type=str, action="store", dest="cbendfilter",
+parser.add_argument('-p', type=str, action="store", dest="cbend_filter",
                     default="0.2,>:responsevelocity,1500,>:responsecumulativedpix")
 parser.add_argument('-k', type=str, action="store",
-                    dest="moviefilter", default="1,=:boutseizurecount")
+                    dest="movie_filter", default="1,=:boutseizurecount")
 
 args = parser.parse_args()
-longmoviename = args.longmoviename
+long_movie_name = args.long_movie_name
 longmovie = False
-if longmoviename != "nomovie":
+if long_movie_name != "nomovie":
     longmovie = True
-outputmovies = args.outputmovies
-roisfile = args.roisfile
-oldtracking = args.oldtracking
-graphonly = args.graphonly
+output_movies = args.output_movies
+rois_file = args.rois_file
+old_tracking = args.old_tracking
+graph_only = args.graph_only
 xyhm = args.xyhm
 social = args.social
-graphparameters = args.graphparameters
-graphmulti = args.graphmulti
-if not graphonly:
-    eventsfile = args.eventsfile
-    centroidfile = args.centroidfile
-    dpixfile = args.dpixfile
-    movieprefix = args.movieprefix
+graph_parameters = args.graph_parameters
+graph_multi = args.graph_multi
+if not graph_only:
+    events_file = args.events_file
+    centroid_file = args.centroid_file
+    dpix_file = args.dpix_file
+    movie_prefix = args.movie_prefix
     genotype_file = args.genotype_file
-    sectionsfile = args.sectionsfile
+    sections_file = args.sections_file
 
 num_of_wells = args.num_of_wells
-msecperframe = args.msecperframe
+msec_per_frame = args.msec_per_frame
 # not used in fileloading but used in processmotiondata
-activitytimes = list(map(int, re.split(',|, |/|/', args.activitytimes)))
+activity_times = list(map(int, re.split(',|, |/|/', args.activity_times)))
 # these bins and activity bins are not going to be less than a second (that doesn't work in code well), so it's fine to use int instead of float
-boutbins = list(map(int, args.boutbins.split(',')))
-thresholdvalues = list(map(float, args.thresholdvalues.split(',')))
-hsthresholdvalues = list(map(float, args.hsthresholdvalues.split(',')))
-thresholdframes = list(map(int, args.thresholdframes.split(',')))
-hsthresholdframes = list(map(int, args.hsthresholdframes.split(',')))
-activitytimesthresholds = list(
-    map(float, args.activitytimesthresholds.split(',')))
+bout_bins = list(map(int, args.bout_bins.split(',')))
+threshold_values = list(map(float, args.threshold_values.split(',')))
+hs_threshold_values = list(map(float, args.hs_threshold_values.split(',')))
+threshold_frames = list(map(int, args.threshold_frames.split(',')))
+hs_threshold_frames = list(map(int, args.hs_threshold_frames.split(',')))
+activity_times_thresholds = list(
+    map(float, args.activity_times_thresholds.split(',')))
 
-seizurefilters = list(map(float, args.seizurefilters.split(',')))
-lightbaseline = args.lightbaseline
-obendfilter = list(map(str, args.obendfilter.split(',')))
-cbendfilter = list(map(str, args.cbendfilter.split(',')))
-moviefilter = list(map(str, args.moviefilter.split(',')))
+seizure_filters = list(map(float, args.seizure_filters.split(',')))
+light_baseline = args.lightbaseline
+obend_filter = list(map(str, args.obend_filter.split(',')))
+cbend_filter = list(map(str, args.cbend_filter.split(',')))
+movie_filter = list(map(str, args.movie_filter.split(',')))
 
 # The Fish object carries all the data around for each fish, including their genotype and ID number
 # Later (after processmotiondata.py) the data inside this Fish object is analyzed (bouts counted, binned, responses counted) and the AnalyzedFish object carries that data
@@ -162,7 +162,7 @@ def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_arra
         split_hs_pos_x = {}
         split_hs_pos_y = {}
         for d in hs_dpix.keys():
-            if oldtracking:
+            if old_tracking:
                 split_hs_dpix[d] = hs_dpix[d][:, well_conversion[n]]
                 split_hs_pos_x[d] = hs_pos[d][:, 2 * well_conversion[n]]
                 split_hs_pos_y[d] = hs_pos[d][:, 2 * well_conversion[n] + 1]
@@ -201,7 +201,7 @@ def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_arra
                     plt.savefig("fish_" + str(n + 1) + "_XYheatmap.png",
                                 transparent=True, format="png")
                     plt.close()
-                if roisfile or longmovie:
+                if rois_file or longmovie:
                     if social:
                         rois_dict[n + 1][2] = rois_dict[n + 1][2] - \
                                               rois_dict[n + 1][0]
@@ -214,22 +214,22 @@ def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_arra
 
 # Start here
 def loading_procedures():
-    if roisfile or longmovie or social:
-        rois_dict = get_rois_from_csv(roisfile)
+    if rois_file or longmovie or social:
+        rois_dict = get_rois_from_csv(rois_file)
 
     startdate = "6/3/2025"
     start_time = datetime.datetime(2025, 6, 3, 18, 2, 5)
     end_time = datetime.datetime(2025, 6, 5, 13, 36, 15)
-    events = load_sections_file(startdate, end_time, start_time, sectionsfile)
+    events = load_sections_file(startdate, end_time, start_time, sections_file)
 
-    hs_dpix, hs_pos = load_highspeed_data(startdate, events, msecperframe, movieprefix, eventsfile, num_of_wells)
+    hs_dpix, hs_pos = load_highspeed_data(startdate, events, msec_per_frame, movie_prefix, events_file, num_of_wells)
 
-    df = pd.read_csv(centroidfile)
+    df = pd.read_csv(centroid_file)
     df.head()
     no_dups = df.drop_duplicates()
 
     if longmovie:
-        firstdpix = open(dpixfile, 'r')
+        firstdpix = open(dpix_file, 'r')
         dp_data_list = []
         dlines = firstdpix.readlines()
         for dline in dlines:
@@ -237,7 +237,7 @@ def loading_procedures():
         dp_data_array = np.array(dp_data_list)
         dp_data_array = dp_data_array.reshape(
             dp_data_array.size // num_of_wells, num_of_wells)
-        cenfile = open(centroidfile, 'r')
+        cenfile = open(centroid_file, 'r')
         cen_data_list = []
         clines = cenfile.readlines()
         for cline in clines:
@@ -254,7 +254,7 @@ def loading_procedures():
         cen_data_array = cen_data_array.reshape(
             cen_data_array.size // (num_of_wells * 2), (num_of_wells * 2))
 
-    centroid_pickle = centroidfile[:-4] + ".p"
+    centroid_pickle = centroid_file[:-4] + ".p"
     if os.path.exists(centroid_pickle):
         with open(centroid_pickle, "rb") as fp:
             tuple_timestamps = pickle.load(fp)
@@ -292,7 +292,7 @@ def initialize_args():
     print("Initializing arguments")
 
 if __name__ == "__main__":
-    rois_dict = get_rois_from_csv(roisfile)
+    rois_dict = get_rois_from_csv(rois_file)
     print(rois_dict)
 
 

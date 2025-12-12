@@ -58,7 +58,7 @@ def cart_to_distance(x1, x2, y1, y2):
 
 
 def save_movie(fish_id, fish_rois, bs, be):
-    fileprefix = fileloading.longmoviename.split(".")[0]
+    fileprefix = fileloading.long_movie_name.split(".")[0]
     moviename = fileprefix + '_' + str(bs) + '_' + str(fish_id) + '.mp4'
     # for ffmpeg the order is w:h:x:y where x and y are top left coordinates
     w = fish_rois[2] - fish_rois[0]
@@ -66,7 +66,7 @@ def save_movie(fish_id, fish_rois, bs, be):
     x = fish_rois[0]
     y = fish_rois[1]
     try:
-        sp.call('ffmpeg -i ' + fileloading.longmoviename + ' -vf "select=between(n\,' +
+        sp.call('ffmpeg -i ' + fileloading.long_movie_name + ' -vf "select=between(n\,' +
                 str(bs - 3) + '\,' + str(be + 3) + '),setpts=10*PTS" -vsync 0 ' + moviename, shell=True)
         # sp.call('ffmpeg -i ' + fileprefix + '.mp4 -vf "select=between(n\,' + str(bs - 3) + '\,' + str(be + 3) + '),setpts=10*PTS" -vsync 0 ' + moviename, shell=True)
         sp.call('ffmpeg -i ' + moviename + ' -filter:v "crop=' + str(w) + ':' +
@@ -74,7 +74,7 @@ def save_movie(fish_id, fish_rois, bs, be):
         # Line below scales the cropped movie for large seizures
     # sp.call('ffmpeg -i ' + 'crop_' + moviename + ' -filter:v scale="150:-1" ' + 'scalecrop_' + moviename, shell=True)
     except:  # IN CASE EVENT HAPPENS TO BE AT AN EDGE, JUST USE THE DEFAULT EVENT FRAMES
-        sp.call('ffmpeg -i ' + fileloading.longmoviename + ' -vf "select=between(n\,' +
+        sp.call('ffmpeg -i ' + fileloading.long_movie_name + ' -vf "select=between(n\,' +
                 str(bs) + '\,' + str(be) + '),setpts=10*PTS" -vsync 0 ' + moviename, shell=True)
         # sp.call('ffmpeg -i ' + fileprefix + '.mp4 -vf "select=between(n\,' + str(bs) + '\,' + str(be) + '),setpts=10*PTS" -vsync 0 ' + moviename, shell=True)
         sp.call('ffmpeg -i ' + moviename + ' -filter:v "crop=' + str(w) + ':' +
@@ -148,7 +148,7 @@ def calculate_boutrev(bout_start, bout_end, unsignedthetas):
 def calculate_boutanglevel(bout_start, bout_end, thetas):
     anglevelframe = []
     for r3 in thetas[bout_start:(bout_end+1)]:
-        anglevelframe.append(abs(float(r3) / float(fileloading.msecperframe)))
+        anglevelframe.append(abs(float(r3) / float(fileloading.msec_per_frame)))
     aveanglevel = (float(sum(anglevelframe)) / float(len(anglevelframe)))
     peakanglevel = max(anglevelframe)
     return aveanglevel, peakanglevel
@@ -313,7 +313,7 @@ def calculate_bout_properties(fish_id, fish_rois, fish_distancesordpix, timestam
                     boutrev = calculate_boutrev(
                         bout_start, bout_end, unsignedthetas)
                     boutproperties["boutrevolutions"].append(boutrev)
-                    if (boutrev > fileloading.seizurefilters[0]) and ((float(boutdistanceordpix) / float(bouttime)) > fileloading.seizurefilters[1]) and (float(boutdistanceordpix) > fileloading.seizurefilters[3]):
+                    if (boutrev > fileloading.seizure_filters[0]) and ((float(boutdistanceordpix) / float(bouttime)) > fileloading.seizure_filters[1]) and (float(boutdistanceordpix) > fileloading.seizure_filters[3]):
                         boutproperties["boutseizurecount"].append(1)
                     else:
                         boutproperties["boutseizurecount"].append(0)
@@ -331,10 +331,10 @@ def calculate_bout_properties(fish_id, fish_rois, fish_distancesordpix, timestam
                     boutproperties["interboutcenterfraction"].append(intercenterfrac)
 
                     # Seems not likely that you would want to filter without real measurements from distance
-                    if fileloading.outputmovies:
+                    if fileloading.output_movies:
                         # PUT IN MOVIE FILTERS AND GET ALL OF THESE FUNCTION INPUTS
                         # get value that was just added to the end of the list and compare to the input filter
-                        if opsP[fileloading.moviefilter[1].split(":")[0]](boutproperties[fileloading.moviefilter[1].split(":")[1]][len(boutproperties[fileloading.moviefilter[1].split(":")[1]]) - 1], int(fileloading.moviefilter[0])):
+                        if opsP[fileloading.movie_filter[1].split(":")[0]](boutproperties[fileloading.movie_filter[1].split(":")[1]][len(boutproperties[fileloading.movie_filter[1].split(":")[1]]) - 1], int(fileloading.movie_filter[0])):
                             save_movie(fish_id, fish_rois, bout_start, bout_end)
     for k in boutproperties.keys():
         boutpropertieswithpre[prefix + k] = boutproperties[k]
@@ -469,9 +469,9 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                         vlist2.append(np.nan)
             else:
                 bout_time = (dpix_bout_end - dpix_bout_start) * \
-                    fileloading.msecperframe
+                    fileloading.msec_per_frame
                 responseproperties["responselatency"].append(
-                    (dpix_bout_start-startframe) * fileloading.msecperframe)
+                    (dpix_bout_start-startframe) * fileloading.msec_per_frame)
                 responseproperties["responsetime"].append(bout_time)
                 responseproperties["responsefrequency"].append(1)
                 bout_disp = cart_to_distance(hs_pos_x[eventtime][dpix_bout_start], hs_pos_x[eventtime]
@@ -498,7 +498,7 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                         peak_dist = float(hs_distances[eventtime][c0])
                     if hs_dict[eventtime][c0] > peak_dpix:
                         peak_dpix = float(hs_dict[eventtime][c0])
-                peak_speed = float(peak_dist) / float(fileloading.msecperframe)
+                peak_speed = float(peak_dist) / float(fileloading.msec_per_frame)
                 responseproperties["responsepeakspeed"].append(peak_speed)
                 responseproperties["responsepeakdpix"].append(peak_dpix)
                 responseproperties["responsecumulativedistance"].append(
@@ -711,7 +711,7 @@ def process_all_data():
     # Obtain indices for the binning used to analyze bouts and also activity (classic sleep plots) data
     timestart = timestamp_data_array[0]
     timeend = timestamp_data_array[len(timestamp_data_array)-1]
-    allbins = fileloading.activitytimes + fileloading.boutbins
+    allbins = fileloading.activity_times + fileloading.bout_bins
     allbinsset = set(allbins)
     indexdict = {}
     for t in allbinsset:
@@ -728,23 +728,23 @@ def process_all_data():
     for fish in fish_list:
         print("FISH: ", fish.idnumber)
         if fileloading.social:
-            for r in range(0, len(fileloading.activitytimes)-1, 2):
-                tup_time = (str(fileloading.activitytimes[r]), str(
-                    fileloading.activitytimes[r+1]))
+            for r in range(0, len(fileloading.activity_times)-1, 2):
+                tup_time = (str(fileloading.activity_times[r]), str(
+                    fileloading.activity_times[r+1]))
                 # fish.add_binned_data(flexactivity(fish_distances, fileloading.activitytimesthresholds[0], indexdict[str(fileloading.activitytimes[r])],indexdict[str(fileloading.activitytimes[r+1])], tup_time))
                 fish.add_binned_data(socialactivity(fish.x_array, fish.rois, indexdict[str(
-                    fileloading.activitytimes[r])], indexdict[str(fileloading.activitytimes[r+1])], tup_time))
+                    fileloading.activity_times[r])], indexdict[str(fileloading.activity_times[r+1])], tup_time))
                 # fish.add_binned_data(socialactivityb(fish.x_array, fish.rois, indexdict[str(fileloading.activitytimes[r])],indexdict[str(fileloading.activitytimes[r+1])], tup_time))
         # continue # if we are doing social, we are going to skip bout stuff, since it really doesn't work well (even though we have a function still, deciding it wasn't ideal). The challenge is in bout definitions for 21 dpf partly.
         # Calculating the distances moved between each frame for both slow-speed data and high-speed movies
         fish_distances = calculate_distance(fish)
         hs_fish_distances = hs_calculate_distance(fish)
         boutstarts, boutends = find_bout_indices(
-            fish_distances, fileloading.thresholdvalues[0], fileloading.thresholdframes[0])
+            fish_distances, fileloading.threshold_values[0], fileloading.threshold_frames[0])
         boutproperties, sleepbouts = calculate_bout_properties(
             fish.idnumber, fish.rois, fish_distances, timestamp_data_array, boutstarts, boutends, fish.rho_array, fish.theta_array, fish.x_array, fish.y_array)
         dboutstarts, dboutends = find_bout_indices(
-            fish.dpix, fileloading.thresholdvalues[1], fileloading.thresholdframes[1])
+            fish.dpix, fileloading.threshold_values[1], fileloading.threshold_frames[1])
         # The "True" indicates that the well center and rho data (and displacement) is already done, and those lists will return as empty
         dboutproperties, dsleepbouts = calculate_bout_properties(
             fish.idnumber, fish.rois, fish.dpix, timestamp_data_array, dboutstarts, dboutends, fish.rho_array, fish.theta_array, fish.x_array, fish.y_array, "dpix_", True)
@@ -756,22 +756,22 @@ def process_all_data():
         # finding waking activity, or active sec / hr that are not inactive minutes
         # fish.add_binned_data(sleep(fish_distances.copy(), fileloading.activitytimesthresholds[0], sleepbouts, indexdict["1"], indexdict["3600"]))
         # fish.add_binned_data(sleep(fish.dpix.copy().astype(float), fileloading.activitytimesthresholds[1], dsleepbouts, indexdict["1"], indexdict["3600"], "dpix_"))
-        for timebin in fileloading.boutbins:
+        for timebin in fileloading.bout_bins:
             fish.add_binned_data(bout_flexactivity(
                 boutproperties, boutstarts, indexdict[str(timebin)], str(timebin)))
             fish.add_binned_data(bout_flexactivity(
                 dboutproperties, dboutstarts, indexdict[str(timebin)], str(timebin)))
-        for r in range(0, len(fileloading.activitytimes)-1, 2):
-            tup_time = (str(fileloading.activitytimes[r]), str(
-                fileloading.activitytimes[r+1]))
-            fish.add_binned_data(flexactivity(fish_distances, fileloading.activitytimesthresholds[0], indexdict[str(
-                fileloading.activitytimes[r])], indexdict[str(fileloading.activitytimes[r+1])], tup_time))
-            fish.add_binned_data(flexactivity(fish.dpix, fileloading.activitytimesthresholds[1], indexdict[str(
-                fileloading.activitytimes[r])], indexdict[str(fileloading.activitytimes[r+1])], tup_time, "dpix_"))
+        for r in range(0, len(fileloading.activity_times)-1, 2):
+            tup_time = (str(fileloading.activity_times[r]), str(
+                fileloading.activity_times[r+1]))
+            fish.add_binned_data(flexactivity(fish_distances, fileloading.activity_times_thresholds[0], indexdict[str(
+                fileloading.activity_times[r])], indexdict[str(fileloading.activity_times[r+1])], tup_time))
+            fish.add_binned_data(flexactivity(fish.dpix, fileloading.activity_times_thresholds[1], indexdict[str(
+                fileloading.activity_times[r])], indexdict[str(fileloading.activity_times[r+1])], tup_time, "dpix_"))
         for es2 in eventsectionlist:
             if es2.type != "time":
                 fish.add_binned_data(calculate_event_properties(es2.name, es2.events, fish.hs_dict, hs_fish_distances,
-                                     fileloading.hsthresholdvalues[1], fileloading.hsthresholdframes[1], fish.hs_pos_x, fish.hs_pos_y))
+                                     fileloading.hs_threshold_values[1], fileloading.hs_threshold_frames[1], fish.hs_pos_x, fish.hs_pos_y))
     # pr.disable()
     # pr.print_stats(sort='time')
     return eventsectionlist, fish_list
@@ -779,14 +779,14 @@ def process_all_data():
 
 # Start here
 fileloading.initialize_args()
-if fileloading.graphonly:
+if fileloading.graph_only:
     print("Skipping fresh run and graphing based on current working directory")
-    graphsstatsandfilter.main(fileloading.graphparameters, fileloading.lightbaseline,
-                              fileloading.obendfilter, fileloading.cbendfilter)
+    graphsstatsandfilter.main(fileloading.graph_parameters, fileloading.light_baseline,
+                              fileloading.obend_filter, fileloading.cbend_filter)
 else:
     print("Processing motion data from start")
     eventsectionlist, fish_list = process_all_data()
     setupgraphsandsavedata.savedataandplot(eventsectionlist, fish_list)
-    graphsstatsandfilter.main(fileloading.graphparameters, fileloading.lightbaseline,
-                              fileloading.obendfilter, fileloading.cbendfilter)
+    graphsstatsandfilter.main(fileloading.graph_parameters, fileloading.light_baseline,
+                              fileloading.obend_filter, fileloading.cbend_filter)
 
