@@ -106,9 +106,9 @@ def box_plot(arrays, type, ylabel, genos):
     plt.close()
 
 
-def ribbon_plot(arrays, type, ylabel, xlabel, t=None):
+def ribbon_plot(arrays, savename, ylabel, xlabel, t=None):
     colors = ['black', 'red', 'blue', 'yellow', 'purple', 'orange']
-    ribgraphname = type + ".png"
+    ribgraphname = savename + ".png"
     fig = plt.figure()
     ax1 = fig.add_subplot(121)
     if t == None:
@@ -270,20 +270,23 @@ def main(graphparametersfile, baselinelight, obendfilters, cbendfilters):
     # Create a dictionary out of the graphing parameters file
     # ribgraph_mean_time_day2nightppi_boutvelocity_600_het.data
     # ribgraph_mean_voltthreshold_day6dpfppinight_responsevelocity_1_a0f1400d5pD300a1f1400d5p_a1%89%97_hom.data
-    genos = set()
     plotdict = {}
     with open(graphparametersfile) as f:
         for line in f:
             (key, val) = line.split(':')
             plotdict[key.strip()] = val.strip()
-    for file1 in glob.glob("ribgraph*.data"):  # Loop to get genotypes
+
+    # Loop to get genotypes
+    genos = set()
+    for file1 in glob.glob("ribgraph*.data"):
         filename = file1.split(".")[0]
         geno = filename.split("_")[-1]
         genos.add(geno)
     genos = list(genos)
     genos.sort()
-    for file2 in glob.glob(
-            "ribgraph*.data"):  # Loop to filter the big moves (cbends and obends) from less strong responses
+
+    # Loop to filter the big moves (cbends and obends) from less strong responses
+    for file2 in glob.glob("ribgraph*.data"):
         array = np.loadtxt(file2, delimiter=',')
         f0 = open(file2)
         header0 = f0.readline().strip()

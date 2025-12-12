@@ -208,24 +208,24 @@ def get_dists_and_posns(no_dups, num_of_wells):
     dists_by_frame = []
 
     indic = [i for i in range(0, int(len(no_dups)), num_of_wells)]
+    frame_arr = no_dups.iloc[indic[0]:indic[1]]
+    xs = list(frame_arr['pos_x'])
+    ys = list(frame_arr['pos_y'])
 
     for count in range(len(indic) - 2):
-        frame_arr = no_dups.iloc[indic[count]:indic[count + 1]]
         next_frame_arr = no_dups.iloc[indic[count + 1]:indic[count + 2]]
 
-        xs = list(frame_arr['pos_x'])
-        ys = list(frame_arr['pos_y'])
         next_xs = list(next_frame_arr['pos_x'])
         next_ys = list(next_frame_arr['pos_y'])
 
         frame_xys = np.array(list(zip(xs, ys))).flatten()
-
-        dists = []
-        for i in range(len(xs)):
-            dists.append(math.dist((xs[i], ys[i]), (next_xs[i], next_ys[i])))
+        dists = [math.dist((xs[i], ys[i]), (next_xs[i], next_ys[i])) for i in range(len(xs))]
 
         posns_by_frame.append(frame_xys)
         dists_by_frame.append(dists)
+
+        xs = next_xs
+        ys = next_ys
 
     return np.array(posns_by_frame), np.array(dists_by_frame)
 
@@ -236,16 +236,11 @@ def get_timestamps_from_csv(no_dups, savefn=""):
     prev_hour = 0
     year = 2025
     month = 6
-    day_count = 3
+    day = 3
 
     count = 0
     frame_start = int(frame_nums[0])
     final_frame = int(frame_nums[-1])
-    print("first frame", frame_start)
-    print("final frame", final_frame)
-    print("len frames", len(frame_nums))
-    hour, minute, second = prev_time.split("_")
-    overalltime = f"{year}_{month}_{day_count}_{hour}_{minute}_{second}"
 
     prev_second = 0
     timestamp_data_dict = {}
@@ -256,36 +251,46 @@ def get_timestamps_from_csv(no_dups, savefn=""):
 
     for i in range(frame_start, final_frame, 1000):
         curr_first_frame = i
-        if i + 999 < final_frame:
-            curr_final_frame = i + 999
+        if i + 1000 < final_frame:
+            curr_final_frame = i + 1000
+            gen_range = range(0,1000)
         else:
             curr_final_frame = final_frame
+            gen_range = range(0,final_frame-i+1)
+
 
         start_ind = no_dups[no_dups['frame'] == curr_first_frame].index[0]
         end_ind = no_dups[no_dups['frame'] == curr_final_frame].index[-1]
 
         trunc_no_dups = no_dups.truncate(before=start_ind, after=end_ind)
-        gen_range = range(curr_first_frame, curr_final_frame)
-        for frame_num in gen_range:
-            curr_time = trunc_no_dups.loc[(trunc_no_dups['frame'] == frame_num) & (trunc_no_dups['row'] == 0) & (
-                    trunc_no_dups['col'] == 0), 'time'].iloc[0]
 
+        times = list(trunc_no_dups.loc[(trunc_no_dups['row'] == 0) & (
+                trunc_no_dups['col'] == 0), 'time'])
+
+        frames = list(trunc_no_dups.loc[(trunc_no_dups['row'] == 0) & (
+                trunc_no_dups['col'] == 0), 'frame'])
+
+        for r in gen_range:
+            curr_time = times[r]
+            frame_num = int(frames[r])
             if prev_time != curr_time:
                 hour, minute, second = prev_time.split("_")
 
                 if hour != prev_hour:
                     if int(hour) == 0:
-                        day_count += 1
+                        day += 1
 
                 if int(hour) == -1:
                     hour, minute, second = curr_time.split("_")
 
-                overalltime = f"{year}_{month}_{day_count}_{hour}_{minute}_{second}"
+                date = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+                ms_date = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second),
+                                            int(frame_num - frame_start) % 100000)
 
                 second = int(second)
                 if second - prev_second > 1:
                     for drop in range(prev_second + 1, second):
-                        dropped_time = datetime.datetime(int(year), int(month), int(day_count), int(hour), int(minute),
+                        dropped_time = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute),
                                                          int(drop), 0)
                         dropped_seconds.append(dropped_time)
 
@@ -293,10 +298,6 @@ def get_timestamps_from_csv(no_dups, savefn=""):
                 prev_hour = hour
                 prev_second = second
 
-            year, month, day, hour, minute, second = overalltime.split("_")
-            date = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-            ms_date = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second),
-                                        int(frame_num - frame_start) % 100000)
             timestamp_data_array.append(date)
             ms_timestamp_data_array.append(ms_date)
             timestamp_data_dict[date] = int(frame_num - frame_start)
