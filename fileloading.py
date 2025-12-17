@@ -20,7 +20,7 @@ parser.add_argument('-longmovie', type=str, action="store",
                     dest="long_movie_name", default="nomovie")
 parser.add_argument('-outputmovies', action="store_true",
                     dest="output_movies", default=False)
-parser.add_argument('-r', type=str, action="store", dest="roisfile")
+parser.add_argument('-r', type=str, action="store", dest="rois_file")
 # Tracked data from before code was updated to have output ROIs, irrelevant for new users, only compatible with 96-well plates
 parser.add_argument('-oldtracking', action="store_true",
                     dest="old_tracking", default=False)
@@ -119,7 +119,7 @@ activity_times_thresholds = list(
     map(float, args.activity_times_thresholds.split(',')))
 
 seizure_filters = list(map(float, args.seizure_filters.split(',')))
-light_baseline = args.lightbaseline
+light_baseline = args.light_baseline
 obend_filter = list(map(str, args.obend_filter.split(',')))
 cbend_filter = list(map(str, args.cbend_filter.split(',')))
 movie_filter = list(map(str, args.movie_filter.split(',')))
