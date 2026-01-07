@@ -5,22 +5,35 @@ import argparse
 import numpy as np
 import re
 import datetime
-import os.path
 from Fish import Fish  # fish object
 import matplotlib.pyplot as plt
-import pickle
-import pandas as pd
 from fileloading_labview import well_conversion
-from fileloading_helpers import get_dists_and_posns, get_rois_from_csv, get_timestamps_from_csv, load_sections_file, load_highspeed_data, convert_to_polar
-
+from fileloading_helpers import load_sections_file, load_highspeed_data, convert_to_polar
+from fileloading_python import load_python_data
+from fileloading_labview import load_labview_data
 
 # Input arguments
 parser = argparse.ArgumentParser(description='loading for fish behavior files')
+parser.add_argument('-python', type=bool, action='store', dest='python', default=False)
+parser.add_argument('-r', type=str, action="store", dest="roisfile")
+parser.add_argument('-e', type=str, action="store", dest="events_file")
+parser.add_argument('-c', type=str, action="store", dest="centroid_file")
+parser.add_argument('-m', type=str, action="store", dest="movie_prefix", default="")
+parser.add_argument('-g', type=str, action="store", dest="genotype_file")
+parser.add_argument('-s', type=str, action="store", dest="sections_file", default="sectionsfile")
+
+parser.add_argument('-n', type=int, action="store",
+                    dest="num_of_wells", default=96)
+
+# labview
+parser.add_argument('-t', type=str, action="store", dest="timestamp_file")
+parser.add_argument('-d', type=str, action="store", dest="dpix_file")
+
+
 parser.add_argument('-longmovie', type=str, action="store",
                     dest="long_movie_name", default="nomovie")
 parser.add_argument('-outputmovies', action="store_true",
                     dest="output_movies", default=False)
-parser.add_argument('-r', type=str, action="store", dest="roisfile")
 # Tracked data from before code was updated to have output ROIs, irrelevant for new users, only compatible with 96-well plates
 parser.add_argument('-oldtracking', action="store_true",
                     dest="old_tracking", default=False)
@@ -34,16 +47,6 @@ parser.add_argument('-graphmulti', type=str, action="store", dest="graph_multi")
 parser.add_argument('-j', type=str, action="store",
                     dest="graph_parameters", default="PlotParameters")
 
-parser.add_argument('-e', type=str, action="store", dest="events_file")
-parser.add_argument('-c', type=str, action="store", dest="centroid_file")
-parser.add_argument('-d', type=str, action="store", dest="dpix_file")
-parser.add_argument('-m', type=str, action="store",
-                    dest="movie_prefix", default="")
-parser.add_argument('-g', type=str, action="store", dest="genotype_file")
-parser.add_argument('-s', type=str, action="store",
-                    dest="sections_file", default="sectionsfile")
-parser.add_argument('-n', type=int, action="store",
-                    dest="num_of_wells", default=96)
 parser.add_argument('-i', type=float, action="store",
                     dest="msec_per_frame", default=3.508772)
 
@@ -85,12 +88,16 @@ parser.add_argument('-k', type=str, action="store",
                     dest="movie_filter", default="1,=:boutseizurecount")
 
 args = parser.parse_args()
+python = args.python
 long_movie_name = args.long_movie_name
 longmovie = False
 if long_movie_name != "nomovie":
     longmovie = True
 output_movies = args.output_movies
+
 rois_file = args.rois_file
+timestamp_file = args.timestamp_file
+
 old_tracking = args.old_tracking
 graph_only = args.graph_only
 xyhm = args.xyhm
@@ -214,9 +221,6 @@ def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_arra
 
 # Start here
 def loading_procedures():
-    if rois_file or longmovie or social:
-        rois_dict = get_rois_from_csv(rois_file)
-
     startdate = "6/3/2025"
     start_time = datetime.datetime(2025, 6, 3, 18, 2, 5)
     end_time = datetime.datetime(2025, 6, 5, 13, 36, 15)
@@ -224,42 +228,16 @@ def loading_procedures():
 
     hs_dpix, hs_pos = load_highspeed_data(startdate, events, msec_per_frame, movie_prefix, events_file, num_of_wells)
 
-    df = pd.read_csv(centroid_file)
-    df.head()
-    no_dups = df.drop_duplicates()
-
-    if longmovie:
-        firstdpix = open(dpix_file, 'r')
-        dp_data_list = []
-        dlines = firstdpix.readlines()
-        for dline in dlines:
-            dp_data_list.append(int(dline))
-        dp_data_array = np.array(dp_data_list)
-        dp_data_array = dp_data_array.reshape(
-            dp_data_array.size // num_of_wells, num_of_wells)
-        cenfile = open(centroid_file, 'r')
-        cen_data_list = []
-        clines = cenfile.readlines()
-        for cline in clines:
-            cen_data_list.append(int(cline))
-        cen_data_array = np.array(cen_data_list)
-        cen_data_array = cen_data_array.reshape(
-            cen_data_array.size // (num_of_wells * 2), (num_of_wells * 2))
+    if python:
+        rois_dict, cen_data_array, dp_data_array, tuple_timestamps = load_python_data(centroid_file, rois_file, num_of_wells)
     else:
-        cen_data_array, dp_data_array = get_dists_and_posns(no_dups, num_of_wells)
+        rois_dict, cen_data_array, dp_data_array, tuple_timestamps = load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, num_of_wells, social, longmovie)
 
-        dp_data_array.resize(dp_data_array.size //
-                             num_of_wells, num_of_wells)
+    dp_data_array.resize(dp_data_array.size //
+                         num_of_wells, num_of_wells)
 
-        cen_data_array = cen_data_array.reshape(
-            cen_data_array.size // (num_of_wells * 2), (num_of_wells * 2))
-
-    centroid_pickle = centroid_file[:-4] + ".p"
-    if os.path.exists(centroid_pickle):
-        with open(centroid_pickle, "rb") as fp:
-            tuple_timestamps = pickle.load(fp)
-    else:
-        tuple_timestamps = get_timestamps_from_csv(no_dups, centroid_pickle)
+    cen_data_array = cen_data_array.reshape(
+        cen_data_array.size // (num_of_wells * 2), (num_of_wells * 2))
 
     print("Done loading timestamp file")
 
@@ -290,9 +268,4 @@ def loading_procedures():
 
 def initialize_args():
     print("Initializing arguments")
-
-if __name__ == "__main__":
-    rois_dict = get_rois_from_csv(rois_file)
-    print(rois_dict)
-
 
