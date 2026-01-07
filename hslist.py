@@ -16,20 +16,21 @@ def find_all_videos_for_tracking(path=None, ext="avi"):
 
     return files_to_read
 
-path = sys.argv[1]
-files = find_all_videos_for_tracking(path)
-files.sort(key=lambda name: int(name.split('/')[-1].split('.')[0].split('-')[1]))
-print(files)
+if __name__ == "__main__":
+    path = sys.argv[1]
+    files = find_all_videos_for_tracking(path)
+    files.sort(key=lambda name: int(name.split('/')[-1].split('.')[0].split('-')[1]))
+    print(files)
 
-for file in files:
+    for file in files:
 #   subprocess.run(["python", "highspeedmovieanalysis.py", "-r", "../../labview_comp_06_03_25/zebrafish-tracker-6-3-25.cells", f"-m {file}", "-e", "../../labview_comp_06_03_25/scheduled-events", "-fd", "660, 992", "-f", "274"])
 #   print(["python", "highspeedmovieanalysis.py", "-r", "../../labview_comp_06_03_25/zebrafish-tracker-6-3-25.cells", f"-m {file}", "-e", "../../labview_comp_06_03_25/scheduled-events", "-fd", "660, 992", "-f", "274"])
-    try:
-#        filenum = int(file.split('/')[-1].split('.')[0].split('-')[1])
+        try:
+            filenum = int(file.split('/')[-1].split('.')[0].split('-')[1])
 
-        cmd = f'python highspeedmovieanalysis.py -r "{path}/zebrafish-tracker.cells" -m "{file}" -e "{path}/scheduled-events" -fd "660, 992" -f 285'
-        print("COMMAND:", cmd)
-        os.system(cmd)
-    except Exception as e:
-        print(e)
+            cmd = f'python highspeedmovieanalysis.py -r "{path}/zebrafish-tracker.cells" -m "{file}" -e "{path}/scheduled-events" -fd "660, 992" -f 285 -filenumber {filenum}'
+            print("COMMAND:", cmd)
+            os.system(cmd)
+        except Exception as e:
+            print(e)
 

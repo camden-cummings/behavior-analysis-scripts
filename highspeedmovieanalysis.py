@@ -53,6 +53,7 @@ parser.add_argument('-b', type=int, action="store", dest="modesplit", default=6)
 parser.add_argument('-s', type=int, action="store", dest="savefrequency", default=4500)
 parser.add_argument('-longmovie', action="store_true", dest="longmovie", default=False)
 parser.add_argument('-ml', type=int, action="store", dest="movielength", default=1)  # in seconds
+parser.add_argument('-filenumber', type=int, action="store", dest="filenumber", required=True)
 
 args = parser.parse_args()
 roisfile = args.roisfile
@@ -67,7 +68,7 @@ modesplit = args.modesplit  # how many sections to split the movie into for mode
 saveFreq = args.savefrequency
 longmovie = args.longmovie
 movlen = args.movielength
-filenumber = videoStream.split('/')[-1].split('.')[0].split('-')[1]
+filenumber = args.filenumber #videoStream.split('/')[-1].split('.')[0].split('-')[1]
 
 
 def calc_mode(deq, nump_arr):
@@ -87,6 +88,7 @@ def calc_mode(deq, nump_arr):
        Mode image
 
     """
+
     for j, k in enumerate(nump_arr[:, 0]):
         nump_arr[j, :] = mode(np.array([x[j, :] for x in deq]))[0]
     return nump_arr
@@ -139,6 +141,8 @@ def imageMode(modename, movielist=[1]):
     fp = "/".join(videoStream.split('/')[:-1])
     for filenumber in movielist:
         fn = glob.glob(f"{fp}/*-{filenumber}.avi")
+        if len(fn) == 0:
+            fn = glob.glob(f"{fp}/*_{filenumber}.avi")
         if len(fn) > 0:
             fn = fn[0]
             cap = cv2.VideoCapture(fn)
@@ -340,12 +344,9 @@ def makenumROIsimage(rois):
 
     num = 0
     for i, line in enumerate(glob.glob(videoStream)):
-        if longmovie:
-            movienum = int(re.split(' |_|.avi', line)[1])
-        else:
-            movienum = int(re.split(' |_|.avi', line)[4])
-        if movienum > num:
-            num = movienum
+        print(i, line)
+        if filenumber > num:
+            num = filenumber
             filename = line
 
     myFrameNumber = (frameRate * movlen) - 1
@@ -664,7 +665,6 @@ def main(rois):
     storedFrame = grayBlur(frame)
     cenData = np.zeros([int(saveFreq), len(np.unique(roimaskweights)) * 2 - 2])
     pixData = np.zeros([int(saveFreq), len(np.unique(roimaskweights))])
-    print('init', cenData.shape, pixData.shape)
     i = 0
     totalFrames = 0
     while cap.isOpened():
@@ -732,8 +732,21 @@ def main(rois):
         makenumROIsimage(rois)
 
 if __name__ == "__main__":
-    with open(roisfile, 'rb') as f:
-        rois = pickle.load(f)
+    try: # python
+        with open(roisfile, 'rb') as f:
+            rois = pickle.load(f)
+    except Exception as e: # labview
+        f = open(roisfile, 'r')
+        lines = f.readlines()
+        rois = []
+        for line in lines:
+            try:
+               int(line.split(' ')[0])
+            except ValueError:
+               continue
+            roi = line.split(' ')
+            roi = [int(r) for r in roi]
+            rois.append([[roi[2], roi[1]], [roi[2], roi[3]], [roi[0], roi[3]], [roi[0], roi[1]]])
 
     if not longmovie:
         main(rois)

@@ -15,7 +15,7 @@ from fileloading_labview import load_labview_data
 # Input arguments
 parser = argparse.ArgumentParser(description='loading for fish behavior files')
 parser.add_argument('-python', type=bool, action='store', dest='python', default=False)
-parser.add_argument('-r', type=str, action="store", dest="roisfile")
+parser.add_argument('-r', type=str, action="store", dest="rois_file")
 parser.add_argument('-e', type=str, action="store", dest="events_file")
 parser.add_argument('-c', type=str, action="store", dest="centroid_file")
 parser.add_argument('-m', type=str, action="store", dest="movie_prefix", default="")
@@ -34,6 +34,7 @@ parser.add_argument('-longmovie', type=str, action="store",
                     dest="long_movie_name", default="nomovie")
 parser.add_argument('-outputmovies', action="store_true",
                     dest="output_movies", default=False)
+parser.add_argument('-r', type=str, action="store", dest="rois_file")
 # Tracked data from before code was updated to have output ROIs, irrelevant for new users, only compatible with 96-well plates
 parser.add_argument('-oldtracking', action="store_true",
                     dest="old_tracking", default=False)
@@ -126,7 +127,7 @@ activity_times_thresholds = list(
     map(float, args.activity_times_thresholds.split(',')))
 
 seizure_filters = list(map(float, args.seizure_filters.split(',')))
-light_baseline = args.lightbaseline
+light_baseline = args.light_baseline
 obend_filter = list(map(str, args.obend_filter.split(',')))
 cbend_filter = list(map(str, args.cbend_filter.split(',')))
 movie_filter = list(map(str, args.movie_filter.split(',')))
@@ -261,10 +262,10 @@ def loading_procedures():
     print("Done loading events")
 
     fish_list = generate_fish_objects(dp_data_array, tuple_rho_theta[0], tuple_rho_theta[1], tuple_rho_theta[2],
-                                      tuple_rho_theta[3], events, hs_dpix, rois_dict)
+                                      tuple_rho_theta[3], hs_dpix, hs_pos, rois_dict)
     #    print(fish_list)
     #    print(global_tuple_events[2])
-    return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], hs_pos
+    return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], events
 
 def initialize_args():
     print("Initializing arguments")
