@@ -1,12 +1,11 @@
 import datetime
 import argparse
+import numpy as np
 
 # This dictionary is only used if -oldtracking is on, for old datasets before ROIs were saved by LabVIEW. Irrelevant for new users.
 well_conversion = {0: 0, 8: 1, 16: 2, 24: 3, 32: 4, 40: 5, 48: 6, 56: 7, 64: 8, 72: 9, 80: 10, 88: 11, 1: 12, 9: 13, 17: 14, 25: 15, 33: 16, 41: 17, 49: 18, 57: 19, 65: 20, 73: 21, 81: 22, 89: 23, 2: 24, 10: 25, 18: 26, 26: 27, 34: 28, 42: 29, 50: 30, 58: 31, 66: 32, 74: 33, 82: 34, 90: 35, 3: 36, 11: 37, 19: 38, 27: 39, 35: 40, 43: 41, 51: 42, 59: 43, 67: 44, 75: 45, 83: 46, 91: 47,
                    4: 48, 12: 49, 20: 50, 28: 51, 36: 52, 44: 53, 52: 54, 60: 55, 68: 56, 76: 57, 84: 58, 92: 59, 5: 60, 13: 61, 21: 62, 29: 63, 37: 64, 45: 65, 53: 66, 61: 67, 69: 68, 77: 69, 85: 70, 93: 71, 6: 72, 14: 73, 22: 74, 30: 75, 38: 76, 46: 77, 54: 78, 62: 79, 70: 80, 78: 81, 86: 82, 94: 83, 7: 84, 15: 85, 23: 86, 31: 87, 39: 88, 47: 89, 55: 90, 63: 91, 71: 92, 79: 93, 87: 94, 95: 95}
 
-parser = argparse.ArgumentParser(description='loading for fish behavior files')
-parser.add_argument('-t', type=str, action="store", dest="tstampfile")
 
 # A fast function for reading time data
 # This depends on have the below format as output, which it is from our LabView program
@@ -53,6 +52,18 @@ def convert_to_ms_time(timestamp_data_array, timestamp_data_dict):
             mseccounter = 0
             break
     return mstimestamp_data_array
+
+def load_dpix(dpixfile, numberofwells):
+    with open(dpixfile, 'rb') as fid:
+        dp_data_array = np.fromfile(fid, dtype='>u2')
+    dp_data_array = dp_data_array.reshape(dp_data_array.size // numberofwells, numberofwells)
+    return dp_data_array
+
+def load_centroids(centroidfile, numberofwells):
+    with open(centroidfile, 'rb') as fid:
+        cen_data_array = np.fromfile(fid, '>u2')
+    cen_data_array = cen_data_array.reshape(cen_data_array.size // (numberofwells * 2), (numberofwells * 2))
+    return cen_data_array
 
 # Load the roi data, for analyzing long movies
 def load_rois(roisfile, social, roi_dict):
@@ -134,4 +145,33 @@ def load_timestamp_file(tstampfile):
     mstimestamp_data_array = convert_to_ms_time(
         timestamp_data_array, timestamp_data_dict)
 #    print(len(timestamp_data_array), len(mstimestamp_data_array), len(timestamp_data_dict))
-    return (mstimestamp_data_array, timestamp_data_dict, dropped_seconds, thistime, starttime)
+    return mstimestamp_data_array, timestamp_data_dict, dropped_seconds, thistime, starttime
+
+def load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, num_of_wells, social, longmovie):
+    tuple_timestamps = load_timestamp_file(timestamp_file)
+
+    rois_dict = {}
+    if longmovie:
+        load_rois(rois_file, social, rois_dict)
+
+        firstdpix = open(dpix_file, 'r')
+        dp_data_list = []
+        dlines = firstdpix.readlines()
+        for dline in dlines:
+            dp_data_list.append(int(dline))
+        dp_data_array = np.array(dp_data_list)
+        dp_data_array = dp_data_array.reshape(
+            dp_data_array.size // num_of_wells, num_of_wells)
+        cenfile = open(centroid_file, 'r')
+        cen_data_list = []
+        clines = cenfile.readlines()
+        for cline in clines:
+            cen_data_list.append(int(cline))
+        cen_data_array = np.array(cen_data_list)
+        cen_data_array = cen_data_array.reshape(
+            cen_data_array.size // (num_of_wells * 2), (num_of_wells * 2))
+    else:
+        cen_data_array = load_centroids(centroid_file, num_of_wells)
+        dp_data_array = load_dpix(dpix_file, num_of_wells)
+
+    return rois_dict, cen_data_array, dp_data_array, tuple_timestamps
