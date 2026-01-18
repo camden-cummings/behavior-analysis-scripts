@@ -526,9 +526,9 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                    newv3 = []
                    for ind, item in enumerate(v3):
                       if ind not in indic:
-                         print('i', item.shape)
+#                         print('i', item.shape)
                          newv3.append(item)
-                   print(v3, newv3)
+#                   print(v3, newv3)
                    binnedlist.append(ProcessedData(k3, np.nanmean(newv3, axis=0), (event,), name))
             if "responsefull" in k3:
                 print(k3)
@@ -541,9 +541,9 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                    newv3 = []
                    for ind, item in enumerate(v3):
                       if ind not in indic:
-                         print('i', item.shape)
+#                         print('i', item.shape)
                          newv3.append(item)
-                   print(v3, newv3)
+#                   print(v3, newv3)
                    binnedlist.append(ProcessedData(k3, np.nanmean(newv3, axis=0), (event,), name))
 
                 else:
@@ -707,7 +707,7 @@ def process_all_data():
     # pr.enable()
     # Load in all the data through the fileloading.py script
     (fish_list, timestamp_data_array, timestamp_data_dict,
-     dropped_seconds, eventsectionlist) = fileloading.loading_procedures()
+     dropped_seconds, eventsectionlist, run_folder) = fileloading.loading_procedures()
     # Obtain indices for the binning used to analyze bouts and also activity (classic sleep plots) data
     timestart = timestamp_data_array[0]
     timeend = timestamp_data_array[len(timestamp_data_array)-1]
@@ -720,7 +720,7 @@ def process_all_data():
         indexdict[str(t)] = binindices
         # Adding the start and end indices for all possible binning for every eventsection, even if you don't need every single one (the numerator bins aren't used)
         for es1 in eventsectionlist:
-            print("es1", es1.starttime, es1.endtime)
+#            print("es1", es1.starttime, es1.endtime)
             indstart, indend = find_indices(
                 es1.starttime, es1.endtime, timestamp_data_dict, binindices)
             es1.add_indices(t, indstart, indend)
@@ -738,11 +738,15 @@ def process_all_data():
         # continue # if we are doing social, we are going to skip bout stuff, since it really doesn't work well (even though we have a function still, deciding it wasn't ideal). The challenge is in bout definitions for 21 dpf partly.
         # Calculating the distances moved between each frame for both slow-speed data and high-speed movies
         fish_distances = calculate_distance(fish)
+#        print(fish_distances)
         hs_fish_distances = hs_calculate_distance(fish)
+#        print(hs_fish_distances)
         boutstarts, boutends = find_bout_indices(
             fish_distances, fileloading.threshold_values[0], fileloading.threshold_frames[0])
+#        print(boutstarts, boutends)
         boutproperties, sleepbouts = calculate_bout_properties(
             fish.idnumber, fish.rois, fish_distances, timestamp_data_array, boutstarts, boutends, fish.rho_array, fish.theta_array, fish.x_array, fish.y_array)
+#        print(boutproperties, sleepbouts)
         dboutstarts, dboutends = find_bout_indices(
             fish.dpix, fileloading.threshold_values[1], fileloading.threshold_frames[1])
         # The "True" indicates that the well center and rho data (and displacement) is already done, and those lists will return as empty
@@ -774,19 +778,19 @@ def process_all_data():
                                      fileloading.hs_threshold_values[1], fileloading.hs_threshold_frames[1], fish.hs_pos_x, fish.hs_pos_y))
     # pr.disable()
     # pr.print_stats(sort='time')
-    return eventsectionlist, fish_list
+    return eventsectionlist, fish_list, run_folder
 
 
 # Start here
 fileloading.initialize_args()
 if fileloading.graph_only:
     print("Skipping fresh run and graphing based on current working directory")
-    graphsstatsandfilter.main(fileloading.graph_parameters, fileloading.light_baseline,
-                              fileloading.obend_filter, fileloading.cbend_filter)
+    run_folder = fileloading.get_movie_prefix()
 else:
     print("Processing motion data from start")
-    eventsectionlist, fish_list = process_all_data()
-    setupgraphsandsavedata.savedataandplot(eventsectionlist, fish_list)
-    graphsstatsandfilter.main(fileloading.graph_parameters, fileloading.light_baseline,
-                              fileloading.obend_filter, fileloading.cbend_filter)
+    eventsectionlist, fish_list, run_folder = process_all_data()
+    setupgraphsandsavedata.savedataandplot(run_folder, eventsectionlist, fish_list)
+
+graphsstatsandfilter.main(run_folder, graphparametersfile=fileloading.graph_parameters, baselinelight=fileloading.light_baseline,
+                          obendfilters=fileloading.obend_filter, cbendfilters=fileloading.cbend_filter)
 

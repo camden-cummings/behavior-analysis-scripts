@@ -6,32 +6,62 @@ import datetime
 import pandas as pd
 import numpy as np
 
+from collections import Counter
 
-def get_dists_and_posns(no_dups, num_of_wells):
-    posns_by_frame = []
-    dists_by_frame = []
 
-    indic = [i for i in range(0, int(len(no_dups)), num_of_wells)]
-    frame_arr = no_dups.iloc[indic[0]:indic[1]]
-    xs = list(frame_arr['pos_x'])
-    ys = list(frame_arr['pos_y'])
+def distwrapper(a, b, c, d):
+    return math.dist((a, b), (c, d))
 
-    for count in range(len(indic) - 2):
-        next_frame_arr = no_dups.iloc[indic[count + 1]:indic[count + 2]]
+def get_dpix_and_posns(no_dups, num_of_wells):
+    posx = np.array(no_dups['pos_x'])
+    posy = np.array(no_dups['pos_y'])
+    dpix = np.array(no_dups['dpix'])
 
-        next_xs = list(next_frame_arr['pos_x'])
-        next_ys = list(next_frame_arr['pos_y'])
+    """
+    vfunc = np.vectorize(distwrapper)
 
-        frame_xys = np.array(list(zip(xs, ys))).flatten()
-        dists = [math.dist((xs[i], ys[i]), (next_xs[i], next_ys[i])) for i in range(len(xs))]
+    curr_x = posx[:-num_of_wells]
+    curr_y = posy[:-num_of_wells]
 
-        posns_by_frame.append(frame_xys)
-        dists_by_frame.append(dists)
+    next_x = posx[num_of_wells:]
+    next_y = posy[num_of_wells:]
 
-        xs = next_xs
-        ys = next_ys
+    final_frame = len(posx)
 
-    return np.array(posns_by_frame), np.array(dists_by_frame)
+    dists = []
+    for i in range(0, final_frame, 96*100):
+        curr_first_frame = i
+        if i + 96*100 < final_frame:
+            curr_final_frame = i + 96*100
+        else:
+            curr_final_frame = final_frame
+
+        dists.extend(vfunc(curr_x[curr_first_frame:curr_final_frame], curr_y[curr_first_frame:curr_final_frame], next_x[curr_first_frame:curr_final_frame], next_y[curr_first_frame:curr_final_frame]))#np.concatenate([a[:-1], a[1:]], axis=1))
+
+    print(np.array(dists).shape)
+    dists = np.resize(np.array(dists), [int(len(dists)/96), 96])
+    """
+
+    a = np.zeros(len(posx)*2)
+    a[0::2] = posx
+    a[1::2] = posy
+    posns_by_frame = a.reshape([int((a.shape[0])/(num_of_wells*2)), (num_of_wells*2)])
+    return np.array(posns_by_frame), np.array(dpix)
+
+def sanity_check(df,
+                 num_of_cells):  # there should never be any rows with same frame number, and if we know the expected number of cells per frame, it's trivial to check that that case isn't the case
+    c = Counter(df['frame'].tolist())
+
+    if len(set(c.values())) > 1:
+        print(
+            f'There are multiple runs in the file given. Trimming dataframe to the the most recent of all of the runs.')
+
+        for frame, count in c.items():
+            if count == num_of_cells:
+                return df[df['frame'] == frame].index[0]
+
+    return None
+
 
 def get_timestamps_from_csv(no_dups, savefn=""):
     frame_nums = list(no_dups['frame'].dropna())
@@ -53,15 +83,15 @@ def get_timestamps_from_csv(no_dups, savefn=""):
 
     dropped_seconds = []
 
-    for i in range(frame_start, final_frame, 1000):
+    div = 10000
+    for i in range(frame_start, final_frame, div):
         curr_first_frame = i
-        if i + 1000 < final_frame:
-            curr_final_frame = i + 1000
-            gen_range = range(0,1000)
+        if i + div < final_frame:
+            curr_final_frame = i + div
+            gen_range = range(0, div)
         else:
             curr_final_frame = final_frame
-            gen_range = range(0,final_frame-i+1)
-
+            gen_range = range(0, final_frame - i + 1)
 
         start_ind = no_dups[no_dups['frame'] == curr_first_frame].index[0]
         end_ind = no_dups[no_dups['frame'] == curr_final_frame].index[-1]
@@ -75,8 +105,10 @@ def get_timestamps_from_csv(no_dups, savefn=""):
                 trunc_no_dups['col'] == 0), 'frame'])
 
         for r in gen_range:
+#            print(r)
             curr_time = times[r]
             frame_num = int(frames[r])
+#            print(frame_num, frame_num-frame_start)
             if prev_time != curr_time:
                 hour, minute, second = prev_time.split("_")
 
@@ -88,9 +120,7 @@ def get_timestamps_from_csv(no_dups, savefn=""):
                     hour, minute, second = curr_time.split("_")
 
                 date = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
-                ms_date = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second),
-                                            int(frame_num - frame_start) % 100000)
-
+                
                 second = int(second)
                 if second - prev_second > 1:
                     for drop in range(prev_second + 1, second):
@@ -98,14 +128,30 @@ def get_timestamps_from_csv(no_dups, savefn=""):
                                                          int(drop), 0)
                         dropped_seconds.append(dropped_time)
 
+                allframes = trunc_no_dups.loc[(trunc_no_dups['time'] == curr_time), 'frame'].tolist()
+                totalframes = int(allframes[-1]) - int(allframes[0])
+
+                mstimer = 0
                 count = 0
                 prev_hour = hour
                 prev_second = second
 
+
+            if mstimer > 0:
+                if mstimer >= totalframes:
+                    totalframes += 1
+                mstime = int((mstimer/(totalframes+1))*1000000)
+                   
+            else:
+                mstime = 0
+
+            ms_date = datetime.datetime(int(year), int(month), int(day), int(hour), int(minute), int(second), mstime)
+
             timestamp_data_array.append(date)
             ms_timestamp_data_array.append(ms_date)
+
             timestamp_data_dict[date] = int(frame_num - frame_start)
-            count += 1
+            mstimer += 1
             prev_time = curr_time
 
             if frame_num == int(frame_start):
@@ -121,6 +167,7 @@ def get_timestamps_from_csv(no_dups, savefn=""):
 
     return timests
 
+
 def get_rois_from_csv(cell_filename):
     roi_bboxs = {}
     with open(cell_filename, 'rb') as f:
@@ -133,20 +180,34 @@ def get_rois_from_csv(cell_filename):
             i += 1
     return roi_bboxs
 
+
 def load_python_data(centroid_file, rois_file, num_of_wells):
     df = pd.read_csv(centroid_file)
-    df.head()
-    no_dups = df.drop_duplicates()
+#    df = df.drop_duplicates()
 
-    rois_dict = get_rois_from_csv(rois_file)
+    print('df loaded')
 
-    cen_data_array, dp_data_array = get_dists_and_posns(no_dups, num_of_wells)
+    val = sanity_check(df, num_of_wells)
+    if val:
+        df = df.truncate(before=val)
+
+    print('sanity check completed')
 
     timestamp_pickle = centroid_file[:-4] + ".p"
     if os.path.exists(timestamp_pickle):
+        print("opening existing timestamp file")
         with open(timestamp_pickle, "rb") as fp:
             tuple_timestamps = pickle.load(fp)
     else:
-        tuple_timestamps = get_timestamps_from_csv(no_dups, timestamp_pickle)
+        tuple_timestamps = get_timestamps_from_csv(df, timestamp_pickle)
+
+    print('timestamps loaded')
+    
+    rois_dict = get_rois_from_csv(rois_file)
+    print('rois loaded')
+
+    cen_data_array, dp_data_array = get_dpix_and_posns(df, num_of_wells)
+    print('posns loaded')
 
     return rois_dict, cen_data_array, dp_data_array, tuple_timestamps
+

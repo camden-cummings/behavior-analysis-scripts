@@ -2,8 +2,8 @@
 
 import numpy as np
 
-def savedata(genodict, iddict, name):
-    ribgraphname = "ribgraph_mean_" + name
+def savedata(folder, genodict, iddict, name):
+    ribgraphname = f"{folder}/ribgraph_mean_" + name
     for geno, data in genodict.items():
         idstr = '-'.join(iddict[geno])
         np.savetxt(ribgraphname + "_" + geno + ".data", np.array(data,
@@ -22,7 +22,7 @@ def listtoNanarray(list):
     return nparray
 
 
-def savedataandplot(eventsectionlist, fish_list):
+def savedataandplot(folder, eventsectionlist, fish_list):
     # Sorting out the Fish objects based on genotype
     genotypes = set()
     for fish in fish_list:
@@ -69,5 +69,5 @@ def savedataandplot(eventsectionlist, fish_list):
                                 splitfishlist[f.genogroup + "-" +
                                               f.realgenotype].append(BD.binned_data)
                                 bdname = BD.name + "_" + str(BD.time_bin[0])
-            savedata(splitfishlist, splitfishids,
+            savedata(folder, splitfishlist, splitfishids,
                      graphtitlemid + "_" + bdname)

@@ -72,7 +72,7 @@ def hm_plot(intensity, heatgraphname, ids, xaxis, yaxis, catarray):
     plt.close()
 
 
-def box_plot(arrays, type, ylabel, genos):
+def box_plot(arrays, save_header, ylabel, genos):
     data = []
     # just want the "het" or "hom" or whatever label
     justgenos = []
@@ -80,7 +80,6 @@ def box_plot(arrays, type, ylabel, genos):
         justgenos.append(g2.split('-')[1])
     for a in arrays:
         data.append(np.asarray(a))
-    boxgraphname = "boxgraph_" + type + ".png"
     dictdata = {}
     for l in range(0, len(data)):
         if data[l].ndim > 1:
@@ -91,7 +90,7 @@ def box_plot(arrays, type, ylabel, genos):
         dictdata[str(l)] = mu1
     df = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in dictdata.items()]))
     df.columns = justgenos
-    df.to_csv(boxgraphname + "_data.csv", sep='\t')
+    df.to_csv(save_header + "_data.csv", sep='\t')
     plt.clf()
     plt.cla()
     fig = plt.figure()
@@ -102,18 +101,17 @@ def box_plot(arrays, type, ylabel, genos):
     ax1.set_axisbelow(True)
     meanlineprops = dict(linestyle='-', linewidth=2.5, color='purple')
     plot = df.boxplot(ax=ax1, meanprops=meanlineprops, meanline=True, showmeans=True)
-    plt.savefig(boxgraphname, transparent=True, format="png")
+    plt.savefig(save_header, transparent=True, format="png")
     plt.close()
 
 
-def ribbon_plot(arrays, savename, ylabel, xlabel, t=None):
+def ribbon_plot(arrays, save_fn, ylabel, xlabel, t=None):
     colors = ['black', 'red', 'blue', 'yellow', 'purple', 'orange']
-    ribgraphname = savename + ".png"
     fig = plt.figure()
     ax1 = fig.add_subplot(121)
     if t == None:
         t = np.arange(np.shape(arrays[0])[1])
-        if "responsefull" in ribgraphname:
+        if "responsefull" in save_fn:
             t = t * 3.5
             xlabel = "Time (msec)"
     for a in range(0, len(arrays)):
@@ -135,7 +133,7 @@ def ribbon_plot(arrays, savename, ylabel, xlabel, t=None):
     ax1.set_xlabel(xlabel)
     ax1.set_ylabel(ylabel)
     ax1.grid()
-    fig.savefig(ribgraphname, transparent=True, format="png")
+    fig.savefig(save_fn, transparent=True, format="png")
     plt.close()
 
 
@@ -240,6 +238,7 @@ def filter_responses(array, ribgraphname, header, filters):
 
 
 def calc_stats(graphname, listofarrays, slowdata=False):
+    print(graphname, len(listofarrays))
     tuplist = []
     # Normal situation is 2
     if (len(listofarrays) == 2):
@@ -265,8 +264,7 @@ def calc_stats(graphname, listofarrays, slowdata=False):
                 except:
                     print("linear model failed: ", graphname)
 
-
-def main(graphparametersfile, baselinelight, obendfilters, cbendfilters):
+def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendfilters="60,>:responsetime,10,>:responsesumabsheadingangle", cbendfilters="0.2,>:responsevelocity,1500,>:responsecumulativedpix"):
     # Create a dictionary out of the graphing parameters file
     # ribgraph_mean_time_day2nightppi_boutvelocity_600_het.data
     # ribgraph_mean_voltthreshold_day6dpfppinight_responsevelocity_1_a0f1400d5pD300a1f1400d5p_a1%89%97_hom.data
@@ -278,15 +276,16 @@ def main(graphparametersfile, baselinelight, obendfilters, cbendfilters):
 
     # Loop to get genotypes
     genos = set()
-    for file1 in glob.glob("ribgraph*.data"):
-        filename = file1.split(".")[0]
+    for file1 in glob.glob(f"{folder}/ribgraph*.data"):
+        filename = file1.split("/")[-1].split(".")[0]
         geno = filename.split("_")[-1]
         genos.add(geno)
+    print(genos)
     genos = list(genos)
     genos.sort()
 
     # Loop to filter the big moves (cbends and obends) from less strong responses
-    for file2 in glob.glob("ribgraph*.data"):
+    for file2 in glob.glob(f"{folder}/ribgraph*.data"):
         array = np.loadtxt(file2, delimiter=',')
         f0 = open(file2)
         header0 = f0.readline().strip()
@@ -306,7 +305,7 @@ def main(graphparametersfile, baselinelight, obendfilters, cbendfilters):
                 # Only calculating for reduction of light
                 if intensity < baselinelight:
                     filter_responses(array, file2, header, obendfilters)
-    for file3 in glob.glob("*ribgraph*" + genos[
+    for file3 in glob.glob(f"{folder}/*ribgraph*" + genos[
         0] + ".data"):  # Loop through (just one genotype) to make graphs and do statistical analyses
         # Make a list of the number of genotypes, if it's more than two give warning, if it's just one also give warning and don't do stats
         arraylist = []
@@ -370,15 +369,15 @@ def main(graphparametersfile, baselinelight, obendfilters, cbendfilters):
         if "_time_" in file3:
             if "_dpix_" in file3:
                 yaxis = yaxis + " [dpix] "
-            timetype = fix_time_outer(file3.split('.')[0].split('_')[-2])
+            timetype = fix_time_outer(file3[-len(folder):].split('.')[0].split('_')[-2])
             yaxis = yaxis + timetype
             for a in range(0, len(arraylist)):
                 if arraylist[a].ndim < 2:
                     arraylist[a] = np.reshape(arraylist[a], (-1, 1))
-                hm_plot(arraylist[a], f"heatgraph_{namelist[a]}.png", idlist[a], timetype.split(" / ")[-1].strip(),
+                hm_plot(arraylist[a], f"{folder}/heatgraph_{namelist[a]}.png", idlist[a], timetype.split(" / ")[-1].strip(),
                         yaxis, catarray)
-            box_plot(arraylist, '_'.join(file3.split('.')[0].split('_')[:-1]), yaxis, genos)
-            ribbon_plot(arraylist, '_'.join(file3.split('.')[0].split('_')[:-1]), yaxis,
+            box_plot(arraylist, f"{folder}/boxgraph_{'_'.join(file3.split('.')[0].split('_')[:-1])}", yaxis, genos)
+            ribbon_plot(arraylist, f"{folder}/'_'.join(file3.split('.')[0].split('_')[:-1])", yaxis,
                         "Time (" + timetype.split(" / ")[-1].strip() + ")")
             # ribgraph_mean_time_day2dfall_numberofbouts_3600_controlgroup-het.data
             calc_stats('_'.join(file3.split('.')[0].split('_')[:-1]), arraylist, True)
@@ -388,11 +387,11 @@ def main(graphparametersfile, baselinelight, obendfilters, cbendfilters):
                 if arraylist[a].ndim < 2:
                     arraylist[a] = np.reshape(arraylist[a], (-1, 1))
                 hm_plot(arraylist[a], namelist[a], idlist[a], "Events", yaxis, catarray)
-            box_plot(arraylist, '_'.join(file3.split('.')[0].split('_')[:-1]), yaxis, genos)
-            ribbon_plot(arraylist, '_'.join(file3.split('.')[0].split('_')[:-1]), yaxis, "Events")
+            box_plot(arraylist, f"{folder}/boxgraph_{'_'.join(file3.split('.')[0].split('_')[:-1])}", yaxis, genos)
+            ribbon_plot(arraylist, f"{folder}/'_'.join(file3.split('.')[0].split('_')[:-1])", yaxis, "Events")
             calc_stats('_'.join(file3.split('.')[0].split('_')[:-1]), arraylist, False)
             nolabel = False
         if nolabel:
             print("Label for plot is not in the input label file! ", file3)
-            box_plot(arraylist, '_'.join(file3.split('.')[0].split('_')[:-1]), "No label", genos)
-            ribbon_plot(arraylist, '_'.join(file3.split('.')[0].split('_')[:-1]), "No label", genos)
+            box_plot(arraylist, f"{folder}/boxgraph_{'_'.join(file3.split('.')[0].split('_')[:-1])}", "No label", genos)
+            ribbon_plot(arraylist, f"{folder}/'_'.join(file3.split('.')[0].split('_')[:-1])", "No label", genos)

@@ -14,7 +14,7 @@ from fileloading_labview import load_labview_data
 
 # Input arguments
 parser = argparse.ArgumentParser(description='loading for fish behavior files')
-parser.add_argument('-python', type=bool, action='store', dest='python', default=False)
+parser.add_argument('-python', action='store_true', dest='python', default=False)
 parser.add_argument('-r', type=str, action="store", dest="rois_file")
 parser.add_argument('-e', type=str, action="store", dest="events_file")
 parser.add_argument('-c', type=str, action="store", dest="centroid_file")
@@ -34,7 +34,6 @@ parser.add_argument('-longmovie', type=str, action="store",
                     dest="long_movie_name", default="nomovie")
 parser.add_argument('-outputmovies', action="store_true",
                     dest="output_movies", default=False)
-parser.add_argument('-r', type=str, action="store", dest="rois_file")
 # Tracked data from before code was updated to have output ROIs, irrelevant for new users, only compatible with 96-well plates
 parser.add_argument('-oldtracking', action="store_true",
                     dest="old_tracking", default=False)
@@ -109,10 +108,10 @@ if not graph_only:
     events_file = args.events_file
     centroid_file = args.centroid_file
     dpix_file = args.dpix_file
-    movie_prefix = args.movie_prefix
     genotype_file = args.genotype_file
     sections_file = args.sections_file
 
+movie_prefix = args.movie_prefix
 num_of_wells = args.num_of_wells
 msec_per_frame = args.msec_per_frame
 # not used in fileloading but used in processmotiondata
@@ -156,7 +155,7 @@ def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_arra
                     "Not using correct nomenclature of controlgroup_genotype: and testgroup_genotype:")
                 realgenotype = line.split(':')[0].split('_')[0]
         fishidslist = line.split(':')[1].strip().split(',')
-        print(fishidslist)
+#        print(fishidslist)
         inputids = []
         for fish_id in fishidslist:
             print(fish_id)
@@ -222,12 +221,10 @@ def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_arra
 
 # Start here
 def loading_procedures():
-    startdate = "6/3/2025"
-    start_time = datetime.datetime(2025, 6, 3, 18, 2, 5)
-    end_time = datetime.datetime(2025, 6, 5, 13, 36, 15)
-    events = load_sections_file(startdate, end_time, start_time, sections_file)
-
-    hs_dpix, hs_pos = load_highspeed_data(startdate, events, msec_per_frame, movie_prefix, events_file, num_of_wells)
+#    startdate = "6/3/2025"
+#    start_time = datetime.datetime(2025, 6, 3, 18, 2, 5)
+#    end_time = datetime.datetime(2025, 6, 5, 13, 36, 15)
+#    events = load_sections_file(startdate, end_time, start_time, sections_file)
 
     if python:
         rois_dict, cen_data_array, dp_data_array, tuple_timestamps = load_python_data(centroid_file, rois_file, num_of_wells)
@@ -253,10 +250,13 @@ def loading_procedures():
     # Day "0" in the sections file corresponds to this start date from the very beginning of the timestamp file
     startdate = str(tuple_timestamps[0][0].month) + "/" + str(
         tuple_timestamps[0][0].day) + "/" + str(tuple_timestamps[0][0].year)
-    endDT = tuple_timestamps[3]
-    print('startdate', startdate, 'endDT', endDT)
-    startDT = tuple_timestamps[4]
-    print('startDT', startDT)
+    end_time = tuple_timestamps[3]
+    print('startdate', startdate, 'endDT', end_time)
+    start_time = tuple_timestamps[4]
+    print('startDT', start_time)
+
+    events = load_sections_file(startdate, end_time, start_time, sections_file)
+    hs_dpix, hs_pos = load_highspeed_data(startdate, events, msec_per_frame, movie_prefix, events_file, num_of_wells, python)
 
     #    global_tuple_events = load_event_data(startdate, endDT, startDT)
     print("Done loading events")
@@ -265,7 +265,10 @@ def loading_procedures():
                                       tuple_rho_theta[3], hs_dpix, hs_pos, rois_dict)
     #    print(fish_list)
     #    print(global_tuple_events[2])
-    return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], events
+    return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], events, movie_prefix
+
+def get_movie_prefix():
+    return movie_prefix
 
 def initialize_args():
     print("Initializing arguments")

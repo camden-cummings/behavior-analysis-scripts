@@ -102,6 +102,7 @@ def load_timestamp_file(tstampfile):
     lines = f.readlines()
     f.close()
     for line in lines:
+#        print(line)
         timestamp_data_array.append(line.strip())
     n = 0
     timestamp_data_dict = {}
@@ -149,11 +150,10 @@ def load_timestamp_file(tstampfile):
 
 def load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, num_of_wells, social, longmovie):
     tuple_timestamps = load_timestamp_file(timestamp_file)
-
     rois_dict = {}
-    if longmovie:
-        load_rois(rois_file, social, rois_dict)
+    load_rois(rois_file, social, rois_dict)
 
+    if longmovie:
         firstdpix = open(dpix_file, 'r')
         dp_data_list = []
         dlines = firstdpix.readlines()
@@ -174,4 +174,5 @@ def load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, num_o
         cen_data_array = load_centroids(centroid_file, num_of_wells)
         dp_data_array = load_dpix(dpix_file, num_of_wells)
 
+    print(rois_dict, cen_data_array, dp_data_array)
     return rois_dict, cen_data_array, dp_data_array, tuple_timestamps

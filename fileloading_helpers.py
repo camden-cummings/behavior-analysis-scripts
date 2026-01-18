@@ -77,7 +77,7 @@ def load_sections_file(startdate, end_time, start_time, sectionsfile):
     return events
 
 
-def load_highspeed_data(startdate, events, msecperframe, movieprefix, events_fn, num_of_wells):
+def load_highspeed_data(startdate, events, msecperframe, movieprefix, events_fn, num_of_wells, python):
     f = open(events_fn, 'r')
     lines = f.readlines()
 
@@ -87,7 +87,11 @@ def load_highspeed_data(startdate, events, msecperframe, movieprefix, events_fn,
     highspeedlist = []
     for file in glob.glob(movieprefix + '*motion2'):
         highspeedlist.append(file)
-    highspeedlist.sort(key=lambda name: int(name.split('/')[-1].split('-')[1].split('.')[0]))
+    
+    if python:
+        highspeedlist.sort(key=lambda name: int(name.split('/')[-1].split('-')[1].split('.')[0]))
+    else:
+        highspeedlist.sort(key=lambda name: int(name.split('/')[-1].split('_')[1].split('.')[0]))
 
     lastAMorPM0 = None
     lastAMorPMcounter0 = 0
