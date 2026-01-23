@@ -178,14 +178,20 @@ def get_rois_from_csv(cell_filename):
             ys = [point[1] for point in roi]
             roi_bboxs[i] = [min(xs), min(ys), max(xs), max(ys)]
             i += 1
-    return roi_bboxs
+    i -= 1
+    return roi_bboxs, i
 
 
-def load_python_data(centroid_file, rois_file, num_of_wells):
-    df = pd.read_csv(centroid_file)
+def load_python_data(centroid_file, rois_file):
+    df = pd.read_csv(centroid_file) #, header=5183042)
+#    df.columns = ['time', 'frame', 'row', 'col', 'pos_x', 'pos_y', 'dpix']
+
 #    df = df.drop_duplicates()
-
+    print(df)
     print('df loaded')
+
+    rois_dict, num_of_wells = get_rois_from_csv(rois_file)
+    print('rois loaded')
 
     val = sanity_check(df, num_of_wells)
     if val:
@@ -203,11 +209,8 @@ def load_python_data(centroid_file, rois_file, num_of_wells):
 
     print('timestamps loaded')
     
-    rois_dict = get_rois_from_csv(rois_file)
-    print('rois loaded')
-
     cen_data_array, dp_data_array = get_dpix_and_posns(df, num_of_wells)
     print('posns loaded')
 
-    return rois_dict, cen_data_array, dp_data_array, tuple_timestamps
+    return rois_dict, num_of_wells, cen_data_array, dp_data_array, tuple_timestamps
 

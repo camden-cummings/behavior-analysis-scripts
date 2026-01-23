@@ -3,9 +3,11 @@
 import numpy as np
 
 def savedata(folder, genodict, iddict, name):
+    print('n', name, genodict)
     ribgraphname = f"{folder}/ribgraph_mean_" + name
     for geno, data in genodict.items():
         idstr = '-'.join(iddict[geno])
+        print(data)
         np.savetxt(ribgraphname + "_" + geno + ".data", np.array(data,
                    dtype=np.float64), delimiter=',', header=idstr)
 
@@ -27,9 +29,10 @@ def savedataandplot(folder, eventsectionlist, fish_list):
     genotypes = set()
     for fish in fish_list:
         genotypes.add(fish.genogroup + "-" + fish.realgenotype)
-#        print(fish.binned_data, fish.rois, fish.idnumber)
+        print(fish.binned_data, fish.rois, fish.idnumber)
 
     for es in eventsectionlist:
+        print(es)
         graphtitlemid = es.type + "_" + es.name
         # Getting list of names of relevant binned data
         binnednames = set()
@@ -69,5 +72,9 @@ def savedataandplot(folder, eventsectionlist, fish_list):
                                 splitfishlist[f.genogroup + "-" +
                                               f.realgenotype].append(BD.binned_data)
                                 bdname = BD.name + "_" + str(BD.time_bin[0])
-            savedata(folder, splitfishlist, splitfishids,
-                     graphtitlemid + "_" + bdname)
+            try:
+                savedata(folder, splitfishlist, splitfishids,
+                         graphtitlemid + "_" + bdname)
+
+            except Exception as e:
+                print(e)

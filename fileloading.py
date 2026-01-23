@@ -4,7 +4,6 @@ import os
 import argparse
 import numpy as np
 import re
-import datetime
 from Fish import Fish  # fish object
 import matplotlib.pyplot as plt
 from fileloading_labview import well_conversion
@@ -21,9 +20,6 @@ parser.add_argument('-c', type=str, action="store", dest="centroid_file")
 parser.add_argument('-m', type=str, action="store", dest="movie_prefix", default="")
 parser.add_argument('-g', type=str, action="store", dest="genotype_file")
 parser.add_argument('-s', type=str, action="store", dest="sections_file", default="sectionsfile")
-
-parser.add_argument('-n', type=int, action="store",
-                    dest="num_of_wells", default=96)
 
 # labview
 parser.add_argument('-t', type=str, action="store", dest="timestamp_file")
@@ -112,7 +108,6 @@ if not graph_only:
     sections_file = args.sections_file
 
 movie_prefix = args.movie_prefix
-num_of_wells = args.num_of_wells
 msec_per_frame = args.msec_per_frame
 # not used in fileloading but used in processmotiondata
 activity_times = list(map(int, re.split(',|, |/|/', args.activity_times)))
@@ -135,7 +130,7 @@ movie_filter = list(map(str, args.movie_filter.split(',')))
 # Later (after processmotiondata.py) the data inside this Fish object is analyzed (bouts counted, binned, responses counted) and the AnalyzedFish object carries that data
 # This analysis code only compares two groups: a control group and a test group
 # Or it can analyze a single group, but no statistics will be done
-def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_array, hs_dpix, hs_pos, rois_dict):
+def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_array, hs_dpix, hs_pos, rois_dict, num_of_wells):
     f = open(genotype_file, 'r')
     lines = f.readlines()
     f.close()
@@ -227,9 +222,11 @@ def loading_procedures():
 #    events = load_sections_file(startdate, end_time, start_time, sections_file)
 
     if python:
-        rois_dict, cen_data_array, dp_data_array, tuple_timestamps = load_python_data(centroid_file, rois_file, num_of_wells)
+        rois_dict, num_of_wells, cen_data_array, dp_data_array, tuple_timestamps = load_python_data(centroid_file, rois_file)
     else:
-        rois_dict, cen_data_array, dp_data_array, tuple_timestamps = load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, num_of_wells, social, longmovie)
+        rois_dict, num_of_wells, cen_data_array, dp_data_array, tuple_timestamps = load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, social, longmovie)
+
+    print('num of wells', num_of_wells)
 
     dp_data_array.resize(dp_data_array.size //
                          num_of_wells, num_of_wells)
@@ -262,7 +259,7 @@ def loading_procedures():
     print("Done loading events")
 
     fish_list = generate_fish_objects(dp_data_array, tuple_rho_theta[0], tuple_rho_theta[1], tuple_rho_theta[2],
-                                      tuple_rho_theta[3], hs_dpix, hs_pos, rois_dict)
+                                      tuple_rho_theta[3], hs_dpix, hs_pos, rois_dict, num_of_wells)
     #    print(fish_list)
     #    print(global_tuple_events[2])
     return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], events, movie_prefix
@@ -272,4 +269,5 @@ def get_movie_prefix():
 
 def initialize_args():
     print("Initializing arguments")
+
 

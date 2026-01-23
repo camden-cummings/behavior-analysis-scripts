@@ -117,7 +117,9 @@ def imageModeLM(modename, frames):
         storedFrame = grayBlur(frame)
         moviedeq.append(storedFrame)
     testing = calc_mode(moviedeq, np.zeros([ydim, xdim]))
-    cv2.imwrite("mode_" + modename + ".png", testing)
+    
+    vid_fp = Path(videoStream)
+    cv2.imwrite(f"{str(vid_fp.parent)}/mode_{modename}.png", testing)
     cap.release()
     cv2.destroyAllWindows()
 
