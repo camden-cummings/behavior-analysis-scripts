@@ -206,7 +206,7 @@ def anova(dataname, nparray1, nparray2):
 # End Statistics
 
 
-def filter_responses(array, ribgraphname, header, filters):
+def filter_responses(array, folder, ribgraphname, header, filters):
     newname_f1 = []
     newname_f2 = []
     for r in ribgraphname.split("_"):
@@ -231,14 +231,15 @@ def filter_responses(array, ribgraphname, header, filters):
     else:
         imxw = np.ma.filled(imxw, np.nan)
         mxw = np.ma.filled(mxw, np.nan)
-    bigname = "realescapes" + ribgraphname
-    smallname = "notescapes" + ribgraphname
+
+    ribg = ribgraphname.split("/")[-1]
+    bigname = f"{folder}/realescapes{ribg}" 
+    smallname = f"{folder}/notescapes{ribg}" 
     np.savetxt(bigname, np.array(imxw, dtype=np.float64), delimiter=',', header=header)
     np.savetxt(smallname, np.array(mxw, dtype=np.float64), delimiter=',', header=header)
 
 
 def calc_stats(graphname, listofarrays, slowdata=False):
-    print(graphname, len(listofarrays))
     tuplist = []
     # Normal situation is 2
     if (len(listofarrays) == 2):
@@ -292,19 +293,19 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendf
         ids = header0.split(" ")[1].split("-")
         header = '-'.join(ids)
         if ("response" in file2) and ("responsefull" not in file2):
-            stim = file2.split(".")[0].split("_")[-2]
+            stim = file2.split("/")[-1].split(".")[0].split("_")[-2]
             if stim.startswith("a"):  # Acoustic stimulus
-                filter_responses(array, file2, header, cbendfilters)
+                filter_responses(array, folder, file2, header, cbendfilters)
             elif stim.startswith("b"):  # Visual stimulus
                 intensity = int(stim.split("%")[0].split("b")[1])  # The voltage of the light
                 # Only calculating for reduction of light
                 if intensity < baselinelight:
-                    filter_responses(array, file2, header, obendfilters)
+                    filter_responses(array, folder, file2, header, obendfilters)
             elif stim.startswith("v"):  # Visual stimulus
                 intensity = int(stim.split("%")[0].split("v")[1])  # The voltage of the light
                 # Only calculating for reduction of light
                 if intensity < baselinelight:
-                    filter_responses(array, file2, header, obendfilters)
+                    filter_responses(array, folder, file2, header, obendfilters)
     for file3 in glob.glob(f"{folder}/*ribgraph*" + genos[
         0] + ".data"):  # Loop through (just one genotype) to make graphs and do statistical analyses
         # Make a list of the number of genotypes, if it's more than two give warning, if it's just one also give warning and don't do stats
@@ -316,7 +317,7 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendf
         header = f.readline()
         ids = header.split(" ")[1].split("-")
         idlist.append(ids)
-        namelist.append(file3.split('.')[0])
+        namelist.append(file3.split('/')[-1].split('.')[0])
         array0 = np.loadtxt(file3, delimiter=',')
         if np.size(array0) == 0:  # if this is an empty dataset
             print("Empty dataset ", file3)
@@ -328,9 +329,11 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendf
             f2 = open(file3.replace(genos[0], genos[g]))
             header2 = f2.readline()
             ids2 = header2.split(" ")[1].split("-")
-            namelist.append(file3.replace(genos[0], genos[g]).split('.')[0])
+            namelist.append(file3.replace(genos[0], genos[g]).split('/')[-1].split('.')[0])
             idlist.append(ids2)
             arraylist.append(np.loadtxt(file3.replace(genos[0], genos[g]), delimiter=','))
+
+        print('NAMELIST                      ', namelist)
         # Example names
         # ribgraph_mean_voltthreshold_day7dpfmsdf_responsevelocity_1_v120a001f1000d5pD995v200_a001%4%12_controlgroup-het.data
         # ribgraph_mean_time_day3heatshock_dpix_bouttime_600_testgroup-hom.png
@@ -386,7 +389,7 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendf
             for a in range(0, len(arraylist)):
                 if arraylist[a].ndim < 2:
                     arraylist[a] = np.reshape(arraylist[a], (-1, 1))
-                hm_plot(arraylist[a], namelist[a], idlist[a], "Events", yaxis, catarray)
+                hm_plot(arraylist[a], f"{folder}/heatgraph_{namelist[a]}.png", idlist[a], "Events", yaxis, catarray)
             box_plot(arraylist, f"{folder}/boxgraph_{'_'.join(file3.split('.')[0].split('_')[:-1])}", yaxis, genos)
             ribbon_plot(arraylist, f"{folder}/'_'.join(file3.split('.')[0].split('_')[:-1])", yaxis, "Events")
             calc_stats('_'.join(file3.split('.')[0].split('_')[:-1]), arraylist, False)

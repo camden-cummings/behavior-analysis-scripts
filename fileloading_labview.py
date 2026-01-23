@@ -66,9 +66,11 @@ def load_centroids(centroidfile, numberofwells):
     return cen_data_array
 
 # Load the roi data, for analyzing long movies
-def load_rois(roisfile, social, roi_dict):
+def load_rois(roisfile, social):
     f = open(roisfile, 'r')
     lines = f.readlines()
+    rois_dict = {}
+
     i = 1
     for line in lines:
         try:
@@ -89,8 +91,10 @@ def load_rois(roisfile, social, roi_dict):
                 minx = minx + (0.13 * (maxx - minx))
                 # maxx = maxx - (0.01 * (maxx - minx))
             # print("ROIS AFTER ", minx, miny, maxx, maxy)
-        roi_dict[i] = [minx, miny, maxx, maxy]
+        rois_dict[i] = [minx, miny, maxx, maxy]
         i += 1
+    i -= 1
+    return rois_dict, i
 
 # The sections file is in 24 hour time, as is Python code
 def load_timestamp_file(tstampfile):
@@ -145,13 +149,13 @@ def load_timestamp_file(tstampfile):
         n = n + 1
     mstimestamp_data_array = convert_to_ms_time(
         timestamp_data_array, timestamp_data_dict)
-#    print(len(timestamp_data_array), len(mstimestamp_data_array), len(timestamp_data_dict))
+    print(len(timestamp_data_array), len(mstimestamp_data_array), len(timestamp_data_dict))
     return mstimestamp_data_array, timestamp_data_dict, dropped_seconds, thistime, starttime
 
-def load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, num_of_wells, social, longmovie):
+def load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, social, longmovie):
     tuple_timestamps = load_timestamp_file(timestamp_file)
-    rois_dict = {}
-    load_rois(rois_file, social, rois_dict)
+    
+    rois_dict, num_of_wells = load_rois(rois_file, social)
 
     if longmovie:
         firstdpix = open(dpix_file, 'r')
@@ -174,5 +178,26 @@ def load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, num_o
         cen_data_array = load_centroids(centroid_file, num_of_wells)
         dp_data_array = load_dpix(dpix_file, num_of_wells)
 
-    print(rois_dict, cen_data_array, dp_data_array)
-    return rois_dict, cen_data_array, dp_data_array, tuple_timestamps
+    return rois_dict, num_of_wells, cen_data_array, dp_data_array, tuple_timestamps
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='loading for fish behavior files')
+
+    parser.add_argument('-r', type=str, action="store", dest="rois_file")
+    parser.add_argument('-c', type=str, action="store", dest="centroid_file")
+    parser.add_argument('-t', type=str, action="store", dest="timestamp_file")
+    parser.add_argument('-d', type=str, action="store", dest="dpix_file")
+    
+    args = parser.parse_args()
+
+    rois_file = args.rois_file
+    timestamp_file = args.timestamp_file
+    centroid_file = args.centroid_file
+    dpix_file = args.dpix_file
+
+    rois_dict, num_of_wells, cen_data_array, dp_data_array, tuple_timestamps = load_labview_data(timestamp_file, rois_file, dpix_file, centroid_file, False, False)
+    start = tuple_timestamps[1][datetime.datetime(2025, 12, 24, 6, 50, 0)]
+    end = tuple_timestamps[1][datetime.datetime(2025, 12, 24, 7, 20, 0)]
+    print('tuple', start, end)
+    print(cen_data_array[start:end])
+#    print(cen_data_array.shape, tuple_timestamps[0])

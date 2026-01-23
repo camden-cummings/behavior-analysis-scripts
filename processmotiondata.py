@@ -469,9 +469,9 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                         vlist2.append(np.nan)
             else:
                 bout_time = (dpix_bout_end - dpix_bout_start) * \
-                    fileloading.msec_per_frame
+                    msec_per_frame
                 responseproperties["responselatency"].append(
-                    (dpix_bout_start-startframe) * fileloading.msec_per_frame)
+                    (dpix_bout_start-startframe) * msec_per_frame)
                 responseproperties["responsetime"].append(bout_time)
                 responseproperties["responsefrequency"].append(1)
                 bout_disp = cart_to_distance(hs_pos_x[eventtime][dpix_bout_start], hs_pos_x[eventtime]
@@ -498,7 +498,7 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                         peak_dist = float(hs_distances[eventtime][c0])
                     if hs_dict[eventtime][c0] > peak_dpix:
                         peak_dpix = float(hs_dict[eventtime][c0])
-                peak_speed = float(peak_dist) / float(fileloading.msec_per_frame)
+                peak_speed = float(peak_dist) / float(msec_per_frame)
                 responseproperties["responsepeakspeed"].append(peak_speed)
                 responseproperties["responsepeakdpix"].append(peak_dpix)
                 responseproperties["responsecumulativedistance"].append(
@@ -685,7 +685,7 @@ def bout_flexactivity(boutproperties, bout_startsl0, intervalindices0, timebin):
                     datadict[k].append(np.nan)
             else:
                 datadict[k].append(np.nanmean(shortlist))
-        if fileloading.social:
+        if social:
             if "socialpreference" in datadict.keys() and "dpix" not in datadict.keys():
                 # should just get the item that was just summed
                 datadict["socialpreference"].append(
@@ -780,17 +780,17 @@ def process_all_data():
     # pr.print_stats(sort='time')
     return eventsectionlist, fish_list, run_folder
 
+if __name__ == "__main__":
+    # Start here
+    fileloading.initialize_args()
+    if fileloading.graph_only:
+        print("Skipping fresh run and graphing based on current working directory")
+        run_folder = fileloading.get_movie_prefix()
+    else:
+        print("Processing motion data from start")
+        eventsectionlist, fish_list, run_folder = process_all_data()
+        setupgraphsandsavedata.savedataandplot(run_folder, eventsectionlist, fish_list)
 
-# Start here
-fileloading.initialize_args()
-if fileloading.graph_only:
-    print("Skipping fresh run and graphing based on current working directory")
-    run_folder = fileloading.get_movie_prefix()
-else:
-    print("Processing motion data from start")
-    eventsectionlist, fish_list, run_folder = process_all_data()
-    setupgraphsandsavedata.savedataandplot(run_folder, eventsectionlist, fish_list)
-
-graphsstatsandfilter.main(run_folder, graphparametersfile=fileloading.graph_parameters, baselinelight=fileloading.light_baseline,
+    graphsstatsandfilter.main(run_folder, graphparametersfile=fileloading.graph_parameters, baselinelight=fileloading.light_baseline,
                           obendfilters=fileloading.obend_filter, cbendfilters=fileloading.cbend_filter)
 
