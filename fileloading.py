@@ -18,6 +18,7 @@ parser.add_argument('-r', type=str, action="store", dest="rois_file")
 parser.add_argument('-e', type=str, action="store", dest="events_file")
 parser.add_argument('-c', type=str, action="store", dest="centroid_file")
 parser.add_argument('-m', type=str, action="store", dest="movie_prefix", default="")
+parser.add_argument('-output_folder', type=str, action="store", dest="run_folder", default="")
 parser.add_argument('-g', type=str, action="store", dest="genotype_file")
 parser.add_argument('-s', type=str, action="store", dest="sections_file", default="sectionsfile")
 
@@ -93,6 +94,7 @@ output_movies = args.output_movies
 
 rois_file = args.rois_file
 timestamp_file = args.timestamp_file
+run_folder = args.run_folder
 
 old_tracking = args.old_tracking
 graph_only = args.graph_only
@@ -252,7 +254,7 @@ def loading_procedures():
     start_time = tuple_timestamps[4]
     print('startDT', start_time)
 
-    events = load_sections_file(startdate, end_time, start_time, sections_file)
+    events = load_sections_file(startdate, end_time, start_time, sections_file, python)
     hs_dpix, hs_pos = load_highspeed_data(startdate, events, msec_per_frame, movie_prefix, events_file, num_of_wells, python)
 
     #    global_tuple_events = load_event_data(startdate, endDT, startDT)
@@ -262,10 +264,10 @@ def loading_procedures():
                                       tuple_rho_theta[3], hs_dpix, hs_pos, rois_dict, num_of_wells)
     #    print(fish_list)
     #    print(global_tuple_events[2])
-    return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], events, movie_prefix
+    return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], events
 
-def get_movie_prefix():
-    return movie_prefix
+def get_run_folder():
+    return run_folder
 
 def initialize_args():
     print("Initializing arguments")

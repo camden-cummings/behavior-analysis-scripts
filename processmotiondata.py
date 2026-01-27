@@ -469,9 +469,9 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                         vlist2.append(np.nan)
             else:
                 bout_time = (dpix_bout_end - dpix_bout_start) * \
-                    msec_per_frame
+                    fileloading.msec_per_frame
                 responseproperties["responselatency"].append(
-                    (dpix_bout_start-startframe) * msec_per_frame)
+                    (dpix_bout_start-startframe) * fileloading.msec_per_frame)
                 responseproperties["responsetime"].append(bout_time)
                 responseproperties["responsefrequency"].append(1)
                 bout_disp = cart_to_distance(hs_pos_x[eventtime][dpix_bout_start], hs_pos_x[eventtime]
@@ -498,7 +498,7 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                         peak_dist = float(hs_distances[eventtime][c0])
                     if hs_dict[eventtime][c0] > peak_dpix:
                         peak_dpix = float(hs_dict[eventtime][c0])
-                peak_speed = float(peak_dist) / float(msec_per_frame)
+                peak_speed = float(peak_dist) / float(fileloading.msec_per_frame)
                 responseproperties["responsepeakspeed"].append(peak_speed)
                 responseproperties["responsepeakdpix"].append(peak_dpix)
                 responseproperties["responsecumulativedistance"].append(
@@ -513,37 +513,25 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                     hs_dict[eventtime][startframe:endframe])
                 responseproperties["responsefulldata"].append(
                     hs_distances[eventtime][startframe:endframe])
+        """
         for k3, v3 in responseproperties.items():
             if len(v3) == 0:
                 continue
             if "responsefull" in k3:
+                print('k3', k3)
                 indic = []
                 for ind, arr in enumerate(v3):
                    if len(arr[~np.isnan(arr)]) == 0:
                       indic.append(ind)
+                      print(ind)
 
                 if len(indic) > 0:
                    newv3 = []
                    for ind, item in enumerate(v3):
                       if ind not in indic:
-#                         print('i', item.shape)
+                         print('i', item.shape)
                          newv3.append(item)
-#                   print(v3, newv3)
-                   binnedlist.append(ProcessedData(k3, np.nanmean(newv3, axis=0), (event,), name))
-            if "responsefull" in k3:
-                print(k3)
-                indic = []
-                for ind, arr in enumerate(v3):
-                   if len(arr[~np.isnan(arr)]) == 0:
-                      indic.append(ind)
-
-                if len(indic) > 0:
-                   newv3 = []
-                   for ind, item in enumerate(v3):
-                      if ind not in indic:
-#                         print('i', item.shape)
-                         newv3.append(item)
-#                   print(v3, newv3)
+                   print('v3', v3, newv3, name, np.nanmean(newv3, axis=0))
                    binnedlist.append(ProcessedData(k3, np.nanmean(newv3, axis=0), (event,), name))
 
                 else:
@@ -551,6 +539,14 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                        k3, np.nanmean(v3, axis=0), (event,), name))
             else:
                 binnedlist.append(ProcessedData(k3, v3, (event,), name))
+        """
+        for k3,v3 in responseproperties.items():
+            if len(v3) == 0:
+                continue
+            if("responsefull" in k3):
+                binnedlist.append(ProcessedData(k3,np.nanmean(v3,axis=0), (event,),name))
+            else:
+                binnedlist.append(ProcessedData(k3,v3, (event,),name))
     return binnedlist
 
 
@@ -685,7 +681,7 @@ def bout_flexactivity(boutproperties, bout_startsl0, intervalindices0, timebin):
                     datadict[k].append(np.nan)
             else:
                 datadict[k].append(np.nanmean(shortlist))
-        if social:
+        if fileloading.social:
             if "socialpreference" in datadict.keys() and "dpix" not in datadict.keys():
                 # should just get the item that was just summed
                 datadict["socialpreference"].append(
@@ -707,7 +703,7 @@ def process_all_data():
     # pr.enable()
     # Load in all the data through the fileloading.py script
     (fish_list, timestamp_data_array, timestamp_data_dict,
-     dropped_seconds, eventsectionlist, run_folder) = fileloading.loading_procedures()
+     dropped_seconds, eventsectionlist) = fileloading.loading_procedures()
     # Obtain indices for the binning used to analyze bouts and also activity (classic sleep plots) data
     timestart = timestamp_data_array[0]
     timeend = timestamp_data_array[len(timestamp_data_array)-1]
@@ -778,14 +774,14 @@ def process_all_data():
                                      fileloading.hs_threshold_values[1], fileloading.hs_threshold_frames[1], fish.hs_pos_x, fish.hs_pos_y))
     # pr.disable()
     # pr.print_stats(sort='time')
-    return eventsectionlist, fish_list, run_folder
+    return eventsectionlist, fish_list, fileloading.run_folder
 
 if __name__ == "__main__":
     # Start here
     fileloading.initialize_args()
     if fileloading.graph_only:
         print("Skipping fresh run and graphing based on current working directory")
-        run_folder = fileloading.get_movie_prefix()
+        run_folder = fileloading.get_run_folder()
     else:
         print("Processing motion data from start")
         eventsectionlist, fish_list, run_folder = process_all_data()
