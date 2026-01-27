@@ -14,6 +14,7 @@ import statsmodels.api as sm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy import stats
 from scipy.stats import mstats
+import warnings
 
 ops = {"<": operator.lt, ">": operator.gt}
 
@@ -83,7 +84,9 @@ def box_plot(arrays, save_header, ylabel, genos):
     dictdata = {}
     for l in range(0, len(data)):
         if data[l].ndim > 1:
-            mu1 = np.nanmean(data[l], axis=1)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(action='ignore', message='Mean of empty slice')
+                mu1 = np.nanmean(data[l], axis=1)
         #		print("mu1: "+str(mu1))
         else:
             mu1 = data[l]
@@ -96,11 +99,12 @@ def box_plot(arrays, save_header, ylabel, genos):
     fig = plt.figure()
     ax1 = fig.add_subplot(121)
     ax1.set_ylabel(ylabel)
-    ax1.set_xticklabels(justgenos)
+    ax1.set_xticks([i for i in range(len(justgenos))], labels=justgenos)
     # ax1.set_ylim(-0.05,0.65)
     ax1.set_axisbelow(True)
     meanlineprops = dict(linestyle='-', linewidth=2.5, color='purple')
     plot = df.boxplot(ax=ax1, meanprops=meanlineprops, meanline=True, showmeans=True)
+#    print(save_header)
     plt.savefig(save_header, transparent=True, format="png")
     plt.close()
 
@@ -118,7 +122,9 @@ def ribbon_plot(arrays, save_fn, ylabel, xlabel, t=None):
         arr = np.asarray(arrays[a])
         # array1 = np.asarray(arrays[0])
         # array2 = np.asarray(arrays[1])
-        mu = np.nanmean(arr, axis=0)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action='ignore', message='Mean of empty slice')
+            mu = np.nanmean(arr, axis=0)
         # mu1 = np.nanmean(array1, axis=0)
         sigma = stats.sem(arr, axis=0, nan_policy='omit')
         # sigma1 = stats.sem(array1, axis=0, nan_policy='omit')
@@ -179,28 +185,30 @@ def linear_model_array(ribgraphname, array1, array2):
 
 # ssmd = (meanwt - meanmut) / (math.sqrt(varwt + varmut)))
 def anova(dataname, nparray1, nparray2):
-    if nparray1.ndim > 1:
-        nanmean1 = np.nanmean(np.nanmean(nparray1, axis=1))
-        # print("nanamean1: "+str(nanmean1))
-        nanvar1 = np.nanvar(np.nanmean(nparray1, axis=1))
-        nanmean2 = np.nanmean(np.nanmean(nparray2, axis=1))
-        # print("nanamean2: "+str(nanmean2))
-        nanvar2 = np.nanvar(np.nanmean(nparray2, axis=1))
-        H, pval = mstats.kruskalwallis(np.nanmean(nparray1, axis=1), np.nanmean(nparray2, axis=1))
-        print("anova: ", dataname,
-              ': N of control, test, Mean of array control, test, Variance of array control, test, SSMD, H-stat, P-value: ',
-              len(np.nanmean(nparray1, axis=1)), len(np.nanmean(nparray2, axis=1)), str(nanmean1), str(nanmean2),
-              str(nanvar1), str(nanvar2), str((nanmean1 - nanmean2) / math.sqrt(nanvar1 + nanvar2)), str(H), str(pval))
-    else:
-        nanmean1 = np.nanmean(np.nanmean(nparray1))
-        nanvar1 = np.nanvar(nparray1)
-        nanmean2 = np.nanmean(np.nanmean(nparray2))
-        nanvar2 = np.nanvar(nparray1)
-        H, pval = mstats.kruskalwallis(nparray1, nparray2)
-        print("anova: ", dataname,
-              ': N of control, test, Mean of array control, test, Variance of array control, test, SSMD, H-stat, P-value: ',
-              len(np.nanmean(nparray1)), len(np.nanmean(nparray2)), str(nanmean1), str(nanmean2), str(nanvar1),
-              str(nanvar2), str((nanmean1 - nanmean2) / math.sqrt(nanvar1 + nanvar2)), str(H), str(pval))
+    with warnings.catch_warnings():
+        warnings.filterwarnings(action='ignore', message='Mean of empty slice')
+        if nparray1.ndim > 1:
+            nanmean1 = np.nanmean(np.nanmean(nparray1, axis=1))
+            # print("nanamean1: "+str(nanmean1))
+            nanvar1 = np.nanvar(np.nanmean(nparray1, axis=1))
+            nanmean2 = np.nanmean(np.nanmean(nparray2, axis=1))
+            # print("nanamean2: "+str(nanmean2))
+            nanvar2 = np.nanvar(np.nanmean(nparray2, axis=1))
+            H, pval = mstats.kruskalwallis(np.nanmean(nparray1, axis=1), np.nanmean(nparray2, axis=1))
+            print("anova: ", dataname,
+                  ': N of control, test, Mean of array control, test, Variance of array control, test, SSMD, H-stat, P-value: ',
+                  len(np.nanmean(nparray1, axis=1)), len(np.nanmean(nparray2, axis=1)), str(nanmean1), str(nanmean2),
+                  str(nanvar1), str(nanvar2), str((nanmean1 - nanmean2) / math.sqrt(nanvar1 + nanvar2)), str(H), str(pval))
+        else:
+            nanmean1 = np.nanmean(np.nanmean(nparray1))
+            nanvar1 = np.nanvar(nparray1)
+            nanmean2 = np.nanmean(np.nanmean(nparray2))
+            nanvar2 = np.nanvar(nparray1)
+            H, pval = mstats.kruskalwallis(nparray1, nparray2)
+            print("anova: ", dataname,
+                  ': N of control, test, Mean of array control, test, Variance of array control, test, SSMD, H-stat, P-value: ',
+                  len(np.nanmean(nparray1)), len(np.nanmean(nparray2)), str(nanmean1), str(nanmean2), str(nanvar1),
+                  str(nanvar2), str((nanmean1 - nanmean2) / math.sqrt(nanvar1 + nanvar2)), str(H), str(pval))
 
 
 # End Statistics
@@ -233,8 +241,8 @@ def filter_responses(array, folder, ribgraphname, header, filters):
         mxw = np.ma.filled(mxw, np.nan)
 
     ribg = ribgraphname.split("/")[-1]
-    bigname = f"{folder}/realescapes{ribg}" 
-    smallname = f"{folder}/notescapes{ribg}" 
+    bigname = f"{folder}/realescapes{ribg}"
+    smallname = f"{folder}/notescapes{ribg}"
     np.savetxt(bigname, np.array(imxw, dtype=np.float64), delimiter=',', header=header)
     np.savetxt(smallname, np.array(mxw, dtype=np.float64), delimiter=',', header=header)
 
@@ -265,7 +273,10 @@ def calc_stats(graphname, listofarrays, slowdata=False):
                 except:
                     print("linear model failed: ", graphname)
 
-def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendfilters="60,>:responsetime,10,>:responsesumabsheadingangle", cbendfilters="0.2,>:responsevelocity,1500,>:responsecumulativedpix"):
+
+def main(folder, graphparametersfile="PlotParameters", baselinelight=200,
+         obendfilters="60,>:responsetime,10,>:responsesumabsheadingangle",
+         cbendfilters="0.2,>:responsevelocity,1500,>:responsecumulativedpix"):
     # Create a dictionary out of the graphing parameters file
     # ribgraph_mean_time_day2nightppi_boutvelocity_600_het.data
     # ribgraph_mean_voltthreshold_day6dpfppinight_responsevelocity_1_a0f1400d5pD300a1f1400d5p_a1%89%97_hom.data
@@ -285,11 +296,17 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendf
     genos = list(genos)
     genos.sort()
 
+
     # Loop to filter the big moves (cbends and obends) from less strong responses
     for file2 in glob.glob(f"{folder}/ribgraph*.data"):
-        array = np.loadtxt(file2, delimiter=',')
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action='ignore', message='loadtxt: input contained no data')
+            array = np.loadtxt(file2, delimiter=',')
+
         f0 = open(file2)
         header0 = f0.readline().strip()
+        f0.close()
+
         ids = header0.split(" ")[1].split("-")
         header = '-'.join(ids)
         if ("response" in file2) and ("responsefull" not in file2):
@@ -306,8 +323,9 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendf
                 # Only calculating for reduction of light
                 if intensity < baselinelight:
                     filter_responses(array, folder, file2, header, obendfilters)
-    for file3 in glob.glob(f"{folder}/*ribgraph*" + genos[
-        0] + ".data"):  # Loop through (just one genotype) to make graphs and do statistical analyses
+
+    for file3 in glob.glob(
+            f"{folder}/ribgraph*{genos[0]}.data"):  # Loop through (just one genotype) to make graphs and do statistical analyses
         # Make a list of the number of genotypes, if it's more than two give warning, if it's just one also give warning and don't do stats
         arraylist = []
         idlist = []
@@ -315,6 +333,7 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendf
         # Get the header for the file that has the fish IDs in order
         f = open(file3)
         header = f.readline()
+        f.close()
         ids = header.split(" ")[1].split("-")
         idlist.append(ids)
         namelist.append(file3.split('/')[-1].split('.')[0])
@@ -332,8 +351,8 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendf
             namelist.append(file3.replace(genos[0], genos[g]).split('/')[-1].split('.')[0])
             idlist.append(ids2)
             arraylist.append(np.loadtxt(file3.replace(genos[0], genos[g]), delimiter=','))
+            f2.close()
 
-        print('NAMELIST                      ', namelist)
         # Example names
         # ribgraph_mean_voltthreshold_day7dpfmsdf_responsevelocity_1_v120a001f1000d5pD995v200_a001%4%12_controlgroup-het.data
         # ribgraph_mean_time_day3heatshock_dpix_bouttime_600_testgroup-hom.png
@@ -369,32 +388,38 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200, obendf
             if foundaxis == False:
                 print("Y-axis is not in the PlotParameters file for the following file: ", file3)
                 yaxis = "No y-axis specified"
+
+
+        graphname = '_'.join(file3.split('/')[-1].split('.')[0].split('_')[:-1])
         if "_time_" in file3:
             if "_dpix_" in file3:
                 yaxis = yaxis + " [dpix] "
-            timetype = fix_time_outer(file3[-len(folder):].split('.')[0].split('_')[-2])
+            timetype = fix_time_outer(file3.split('/')[-1].split('.')[0].split('_')[-2])
             yaxis = yaxis + timetype
             for a in range(0, len(arraylist)):
                 if arraylist[a].ndim < 2:
                     arraylist[a] = np.reshape(arraylist[a], (-1, 1))
-                hm_plot(arraylist[a], f"{folder}/heatgraph_{namelist[a]}.png", idlist[a], timetype.split(" / ")[-1].strip(),
+                hm_plot(arraylist[a], f"{folder}/heatgraph_{namelist[a]}.png", idlist[a],
+                        timetype.split(" / ")[-1].strip(),
                         yaxis, catarray)
-            box_plot(arraylist, f"{folder}/boxgraph_{'_'.join(file3.split('.')[0].split('_')[:-1])}", yaxis, genos)
-            ribbon_plot(arraylist, f"{folder}/'_'.join(file3.split('.')[0].split('_')[:-1])", yaxis,
+            box_plot(arraylist, f"{folder}/boxgraph_{graphname}.png", yaxis, genos)
+            ribbon_plot(arraylist, f"{folder}/{graphname}.png", yaxis,
                         "Time (" + timetype.split(" / ")[-1].strip() + ")")
             # ribgraph_mean_time_day2dfall_numberofbouts_3600_controlgroup-het.data
-            calc_stats('_'.join(file3.split('.')[0].split('_')[:-1]), arraylist, True)
+            calc_stats(graphname, arraylist, True)
             nolabel = False
         else:  # response graphs
             for a in range(0, len(arraylist)):
                 if arraylist[a].ndim < 2:
                     arraylist[a] = np.reshape(arraylist[a], (-1, 1))
                 hm_plot(arraylist[a], f"{folder}/heatgraph_{namelist[a]}.png", idlist[a], "Events", yaxis, catarray)
-            box_plot(arraylist, f"{folder}/boxgraph_{'_'.join(file3.split('.')[0].split('_')[:-1])}", yaxis, genos)
-            ribbon_plot(arraylist, f"{folder}/'_'.join(file3.split('.')[0].split('_')[:-1])", yaxis, "Events")
-            calc_stats('_'.join(file3.split('.')[0].split('_')[:-1]), arraylist, False)
+            box_plot(arraylist, f"{folder}/boxgraph_{graphname}.png", yaxis, genos)
+            ribbon_plot(arraylist, f"{folder}/{graphname}.png", yaxis, "Events")
+            calc_stats(graphname, arraylist, False)
             nolabel = False
         if nolabel:
             print("Label for plot is not in the input label file! ", file3)
-            box_plot(arraylist, f"{folder}/boxgraph_{'_'.join(file3.split('.')[0].split('_')[:-1])}", "No label", genos)
-            ribbon_plot(arraylist, f"{folder}/'_'.join(file3.split('.')[0].split('_')[:-1])", "No label", genos)
+            box_plot(arraylist, f"{folder}/boxgraph_{graphname}.png", "No label", genos)
+            ribbon_plot(arraylist, f"{folder}/{graphname}.png", "No label", genos)
+
+
