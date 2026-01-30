@@ -3,11 +3,11 @@
 import numpy as np
 
 def savedata(folder, genodict, iddict, name):
-    print('n', name, genodict)
+#    print('n', name, genodict)
     ribgraphname = f"{folder}/ribgraph_mean_" + name
     for geno, data in genodict.items():
         idstr = '-'.join(iddict[geno])
-        print(data)
+#        print(data)
         np.savetxt(ribgraphname + "_" + geno + ".data", np.array(data,
                    dtype=np.float64), delimiter=',', header=idstr)
 
@@ -72,9 +72,4 @@ def savedataandplot(folder, eventsectionlist, fish_list):
                                 splitfishlist[f.genogroup + "-" +
                                               f.realgenotype].append(BD.binned_data)
                                 bdname = BD.name + "_" + str(BD.time_bin[0])
-            try:
-                savedata(folder, splitfishlist, splitfishids,
-                         graphtitlemid + "_" + bdname)
-
-            except Exception as e:
-                print(e)
+            savedata(folder, splitfishlist, splitfishids, graphtitlemid + "_" + bdname)

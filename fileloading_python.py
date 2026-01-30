@@ -174,9 +174,11 @@ def get_rois_from_csv(cell_filename):
         rois = pickle.load(f)
         i = 1
         for roi in rois:
+            print(roi)
             xs = [point[0] for point in roi]
             ys = [point[1] for point in roi]
             roi_bboxs[i] = [min(xs), min(ys), max(xs), max(ys)]
+            print(roi_bboxs[i])
             i += 1
     i -= 1
     return roi_bboxs, i

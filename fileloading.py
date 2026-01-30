@@ -155,7 +155,7 @@ def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_arra
 #        print(fishidslist)
         inputids = []
         for fish_id in fishidslist:
-            print(fish_id)
+            #print(fish_id)
             # Have to subtract 1 so that we can start from 0
             # Keeping it like this, but then adding 1 back to the ID that is saved
             inputids.append(int(fish_id) - 1)
@@ -212,6 +212,7 @@ def generate_fish_objects(dp_data_array, rho_array, theta_array, x_array, y_arra
                         rois_dict[n + 1][0] = 0
                         newfish.add_rois(rois_dict[n + 1])
                     else:
+                        #print("fish roi:",n + 1,x.split('_')[0],x.split('_')[1],rois_dict[n+1])
                         newfish.add_rois(rois_dict[n + 1])
                 fish_list.append(newfish)
     return fish_list
@@ -259,11 +260,13 @@ def loading_procedures():
 
     #    global_tuple_events = load_event_data(startdate, endDT, startDT)
     print("Done loading events")
+    #print(rois_dict)
 
     fish_list = generate_fish_objects(dp_data_array, tuple_rho_theta[0], tuple_rho_theta[1], tuple_rho_theta[2],
                                       tuple_rho_theta[3], hs_dpix, hs_pos, rois_dict, num_of_wells)
     #    print(fish_list)
     #    print(global_tuple_events[2])
+#    exit()
     return fish_list, tuple_timestamps[0], tuple_timestamps[1], tuple_timestamps[2], events
 
 def get_run_folder():

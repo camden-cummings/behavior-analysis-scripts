@@ -14,6 +14,7 @@ import statsmodels.api as sm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy import stats
 from scipy.stats import mstats
+from pathlib import Path
 import warnings
 
 ops = {"<": operator.lt, ">": operator.gt}
@@ -215,32 +216,36 @@ def anova(dataname, nparray1, nparray2):
 
 
 def filter_responses(array, folder, ribgraphname, header, filters):
+    if isinstance(filters, str):
+        filters = filters.split(",")
+    ribg = Path(ribgraphname).name
+    parts = ribg.split("_")
     newname_f1 = []
     newname_f2 = []
-    for r in ribgraphname.split("_"):
+    for r in parts:
         if r.startswith("response"):
             newname_f1.append(filters[1].split(":")[1])
             newname_f2.append(filters[3].split(":")[1])
         else:
             newname_f1.append(r)
             newname_f2.append(r)
-    f1_array = np.loadtxt("_".join(newname_f1), delimiter=',')
-    f2_array = np.loadtxt("_".join(newname_f2), delimiter=',')
+    f1_path = Path(folder) / "_".join(newname_f1)
+    f2_path = Path(folder) / "_".join(newname_f2)
+    f1_array = np.loadtxt(str(f1_path), delimiter=",")
+    f2_array = np.loadtxt(str(f2_path), delimiter=",")
     bool_f1 = ops[filters[1].split(":")[0]](f1_array, float(filters[0]))
     bool_f2 = ops[filters[3].split(":")[0]](f2_array, float(filters[2]))
     boolmask = np.logical_and(bool_f1, bool_f2)
     invboolmask = np.logical_not(np.logical_and(bool_f1, bool_f2))
     mxw = np.ma.masked_array(array, mask=boolmask)
     imxw = np.ma.masked_array(array, mask=invboolmask)
-    if "_responsefrequency_" in ribgraphname:
+    if "_responsefrequency_" in ribg:
         imxw = np.ma.filled(imxw, 0)
         mxw = np.ma.filled(mxw, 0)
         imxw[np.isnan(mxw)] = np.nan
     else:
         imxw = np.ma.filled(imxw, np.nan)
         mxw = np.ma.filled(mxw, np.nan)
-
-    ribg = ribgraphname.split("/")[-1]
     bigname = f"{folder}/realescapes{ribg}"
     smallname = f"{folder}/notescapes{ribg}"
     np.savetxt(bigname, np.array(imxw, dtype=np.float64), delimiter=',', header=header)

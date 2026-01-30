@@ -90,7 +90,7 @@ def load_rois(roisfile, social):
             else:
                 minx = minx + (0.13 * (maxx - minx))
                 # maxx = maxx - (0.01 * (maxx - minx))
-            # print("ROIS AFTER ", minx, miny, maxx, maxy)
+#        print("ROIS AFTER ", minx, miny, maxx, maxy)
         rois_dict[i] = [minx, miny, maxx, maxy]
         i += 1
     i -= 1

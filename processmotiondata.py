@@ -11,7 +11,7 @@ import setupgraphsandsavedata
 import graphsstatsandfilter
 import operator
 
-from social import socialactivity
+#from social import socialactivity
 
 # using "=" in this input code for strings, but it really means ==
 opsP = {"<": operator.lt, ">": operator.gt, "=": operator.eq}
@@ -513,7 +513,7 @@ def calculate_event_properties(name, eventsection, hs_dict, hs_distances, thresh
                     hs_dict[eventtime][startframe:endframe])
                 responseproperties["responsefulldata"].append(
                     hs_distances[eventtime][startframe:endframe])
-        """
+        """        
         for k3, v3 in responseproperties.items():
             if len(v3) == 0:
                 continue
@@ -728,8 +728,8 @@ def process_all_data():
                 tup_time = (str(fileloading.activity_times[r]), str(
                     fileloading.activity_times[r+1]))
                 # fish.add_binned_data(flexactivity(fish_distances, fileloading.activitytimesthresholds[0], indexdict[str(fileloading.activitytimes[r])],indexdict[str(fileloading.activitytimes[r+1])], tup_time))
-                fish.add_binned_data(socialactivity(fish.x_array, fish.rois, indexdict[str(
-                    fileloading.activity_times[r])], indexdict[str(fileloading.activity_times[r+1])], tup_time))
+                ####fish.add_binned_data(socialactivity(fish.x_array, fish.rois, indexdict[str(
+                   #### fileloading.activity_times[r])], indexdict[str(fileloading.activity_times[r+1])], tup_time))
                 # fish.add_binned_data(socialactivityb(fish.x_array, fish.rois, indexdict[str(fileloading.activitytimes[r])],indexdict[str(fileloading.activitytimes[r+1])], tup_time))
         # continue # if we are doing social, we are going to skip bout stuff, since it really doesn't work well (even though we have a function still, deciding it wasn't ideal). The challenge is in bout definitions for 21 dpf partly.
         # Calculating the distances moved between each frame for both slow-speed data and high-speed movies

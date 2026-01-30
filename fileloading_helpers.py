@@ -50,7 +50,7 @@ def load_movie_motion(hs_dpix, thistime, moviename, num_of_wells):
 
 
 # Loading in the high-speed movies and the sections we will analyze (sectionsfile)
-def load_sections_file(startdate, end_time, start_time, sectionsfile):
+def load_sections_file(startdate, end_time, start_time, sectionsfile, python):
     # Load in the original events file
     # Tab separation vs spacing is KEY in the events file (LabView will fail if not right, and so will this code)
     events = []
@@ -62,7 +62,7 @@ def load_sections_file(startdate, end_time, start_time, sectionsfile):
         # For example, the prepulse test has both strong tap, weak tap, and prepulse tap events in that section
         # Sections are designated by the user in the sections file and have a specific naming convention
         try:
-            eventsection = EventSection(sline.strip(), startdate)
+            eventsection = EventSection(sline.strip(), startdate, python)
         except:
             print(
                 "The format of the input of your sections files is wrong. Every line should be as follows: habituation_daytaps=1_15:25:30-1_16:59:00")
