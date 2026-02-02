@@ -7,7 +7,7 @@ import re
 from Fish import Fish  # fish object
 import matplotlib.pyplot as plt
 from fileloading_labview import well_conversion
-from fileloading_helpers import load_sections_file, load_highspeed_data, convert_to_polar
+from fileloading_helpers import load_sections_file, load_highspeed_data, convert_to_polar, load_genotypes
 from fileloading_python import load_python_data
 from fileloading_labview import load_labview_data
 

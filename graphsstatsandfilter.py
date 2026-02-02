@@ -241,8 +241,10 @@ def filter_responses(array, folder, ribgraphname, header, filters):
         mxw = np.ma.filled(mxw, np.nan)
 
     ribg = ribgraphname.split("/")[-1]
-    bigname = f"{folder}/realescapes{ribg}"
-    smallname = f"{folder}/notescapes{ribg}"
+
+    bigname = f"{folder}/realescapes{ribg}" 
+    smallname = f"{folder}/notescapes{ribg}" 
+
     np.savetxt(bigname, np.array(imxw, dtype=np.float64), delimiter=',', header=header)
     np.savetxt(smallname, np.array(mxw, dtype=np.float64), delimiter=',', header=header)
 
@@ -324,8 +326,7 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200,
                 if intensity < baselinelight:
                     filter_responses(array, folder, file2, header, obendfilters)
 
-    for file3 in glob.glob(
-            f"{folder}/ribgraph*{genos[0]}.data"):  # Loop through (just one genotype) to make graphs and do statistical analyses
+    for file3 in glob.glob(f"{folder}/ribgraph*{genos[0]}.data"):  # Loop through (just one genotype) to make graphs and do statistical analyses
         # Make a list of the number of genotypes, if it's more than two give warning, if it's just one also give warning and don't do stats
         arraylist = []
         idlist = []
@@ -351,6 +352,7 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200,
             namelist.append(file3.replace(genos[0], genos[g]).split('/')[-1].split('.')[0])
             idlist.append(ids2)
             arraylist.append(np.loadtxt(file3.replace(genos[0], genos[g]), delimiter=','))
+
             f2.close()
 
         # Example names
@@ -413,9 +415,11 @@ def main(folder, graphparametersfile="PlotParameters", baselinelight=200,
                 if arraylist[a].ndim < 2:
                     arraylist[a] = np.reshape(arraylist[a], (-1, 1))
                 hm_plot(arraylist[a], f"{folder}/heatgraph_{namelist[a]}.png", idlist[a], "Events", yaxis, catarray)
+
             box_plot(arraylist, f"{folder}/boxgraph_{graphname}.png", yaxis, genos)
             ribbon_plot(arraylist, f"{folder}/{graphname}.png", yaxis, "Events")
             calc_stats(graphname, arraylist, False)
+
             nolabel = False
         if nolabel:
             print("Label for plot is not in the input label file! ", file3)
